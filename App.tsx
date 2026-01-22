@@ -130,11 +130,22 @@ const App: React.FC = () => {
     setSelectedStudent(null);
   };
 
-  const handleResetData = () => {
-    if (window.confirm("ATENÇÃO: Isso apagará TODOS os alunos do sistema. Deseja continuar?")) {
-      saveStudents([]);
-      setSelectedStudent(null);
-      alert("Sistema resetado com sucesso!");
+  const handleResetData = async () => {
+    if (window.confirm("ATENÇÃO: Isso apagará TODOS os alunos do sistema permanentemente do Banco de Dados. Deseja continuar?")) {
+      setLoading(true);
+      try {
+        const { error } = await supabase.from('mc_students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+
+        await fetchInitialData();
+        setSelectedStudent(null);
+        alert("Banco de dados resetado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao resetar:", error);
+        alert("Erro ao limpar dados do servidor.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
