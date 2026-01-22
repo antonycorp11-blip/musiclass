@@ -76,8 +76,24 @@ const App: React.FC = () => {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const { data: bTeachers } = await supabase.from('mc_teachers').select('*');
-      if (bTeachers) setTeachers(bTeachers);
+      const { data: bTeachers, error: tError } = await supabase.from('mc_teachers').select('*');
+      if (tError) {
+        console.error("Supabase Teacher Error:", tError);
+      }
+
+      // Se bTeachers vier nulo ou vazio e não houver erro de rede, 
+      // garantimos pelo menos o diretor hardcoded para evitar tela em branco
+      if (bTeachers && bTeachers.length > 0) {
+        setTeachers(bTeachers);
+      } else {
+        console.warn("Nenhum professor encontrado no banco, usando fallback local.");
+        setTeachers([{
+          id: 'emergency-director',
+          name: 'MusiClass Diretor',
+          password: 'admin',
+          role: 'director'
+        }]);
+      }
 
       const { data: bStudents } = await supabase.from('mc_students').select('*').order('name');
       if (bStudents) setStudents(bStudents);
@@ -86,6 +102,13 @@ const App: React.FC = () => {
       if (bHistory) setLessonHistory(bHistory);
     } catch (error) {
       console.error("Error fetching data:", error);
+      // Fallback em caso de erro total de conexão
+      setTeachers([{
+        id: 'emergency-director',
+        name: 'MusiClass Diretor',
+        password: 'admin',
+        role: 'director'
+      }]);
     } finally {
       setLoading(false);
     }
