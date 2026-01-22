@@ -172,17 +172,20 @@ const App: React.FC = () => {
     const name = formData.get('name') as string;
     const instrument = formData.get('instrument') as Instrument;
 
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(currentUser.id);
+
     const { error } = await supabase.from('mc_students').insert([{
       name,
       age: formData.get('age') ? Number(formData.get('age')) : undefined,
       instrument,
       level: formData.get('level') as Level,
-      teacher_id: currentUser.id
+      teacher_id: isValidUUID ? currentUser.id : null
     }]);
 
     if (error) {
+      console.error("Erro ao salvar:", error);
       if (error.code === '23505') return alert("Este aluno já está cadastrado para este instrumento.");
-      return alert("Erro ao salvar aluno.");
+      return alert(`Erro ao salvar aluno: ${error.message}`);
     }
 
     await fetchInitialData();
@@ -250,22 +253,30 @@ const App: React.FC = () => {
           else if (lowerInst.includes('vocal') || lowerInst.includes('voice') || lowerInst.includes('canto')) instrument = Instrument.VOCALS;
           else if (lowerInst.includes('viol') || lowerInst.includes('guitar')) instrument = Instrument.GUITAR;
 
-          const exists = students.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.instrument === instrument);
 
-          if (!exists) {
+          const exists = students.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.instrument === instrument);
+          const inBatch = batch.some(s => s.name.toLowerCase() === fullName.toLowerCase() && s.instrument === instrument);
+
+          if (!exists && !inBatch) {
+            // Validar se o teacherId é um UUID válido para o Postgres
+            const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(teacherId);
+
             batch.push({
               name: fullName,
               age,
               instrument,
               level: Level.BEGINNER,
-              teacher_id: teacherId
+              teacher_id: isValidUUID ? teacherId : null
             });
           }
         }
 
         if (batch.length > 0) {
           const { error } = await supabase.from('mc_students').insert(batch);
-          if (error) return alert("Erro ao importar alguns alunos.");
+          if (error) {
+            console.error("Erro na importação:", error);
+            return alert(`Erro ao importar alunos: ${error.message} (${error.details || 'Verifique se há nomes duplicados na planilha'})`);
+          }
 
           await fetchInitialData();
           let msg = `${batch.length} novos alunos importados com sucesso!`;
