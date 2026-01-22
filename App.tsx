@@ -144,7 +144,10 @@ const App: React.FC = () => {
       return;
     }
     const { data, error } = await supabase.from('mc_teachers').insert([{ name, password: pass, role: 'teacher' }]).select();
-    if (error) return alert("Erro ao salvar professor.");
+    if (error) {
+      console.error("Erro Supabase:", error);
+      return alert(`Erro ao salvar professor: ${error.message || 'Erro desconhecido'}`);
+    }
 
     await fetchInitialData();
     alert(`${name} cadastrado com sucesso!`);
