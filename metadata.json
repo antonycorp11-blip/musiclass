@@ -1,0 +1,5 @@
+{
+  "name": "MusiClass - Gestor para Professores",
+  "description": "Um ecossistema completo para professores de música gerirem alunos, criarem diagramas de acordes, tablaturas, e enviarem tarefas com auxílio de IA.",
+  "requestFramePermissions": []
+}

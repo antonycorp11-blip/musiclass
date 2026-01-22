@@ -1,0 +1,386 @@
+
+import React, { useState, useEffect } from 'react';
+import {
+  Users,
+  BookOpen,
+  Plus,
+  Music,
+  Trash2,
+  X,
+  Settings2,
+  Zap,
+  Layout,
+  PlusCircle,
+  ListTodo,
+  Upload,
+  LogOut,
+  ChevronRight,
+  Sparkles,
+  FileText
+} from 'lucide-react';
+
+import { Instrument, Level, Student, Teacher } from './types';
+import { ROOTS, CHORD_TYPES, SCALES } from './constants';
+import { MusicEngine } from './services/musicEngine';
+import { ChordVisualizer } from './components/ChordVisualizer';
+import { TabEditor } from './components/TabEditor';
+import { StudentPreview } from './components/StudentPreview';
+import { Login } from './components/Login';
+
+const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<Teacher | null>(null);
+  const [activeTab, setActiveTab] = useState<'students' | 'lesson'>('students');
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+  // Lesson State
+  const [currentChords, setCurrentChords] = useState<any[]>([]);
+  const [currentScales, setCurrentScales] = useState<any[]>([]);
+  const [currentTabs, setCurrentTabs] = useState<{ id: string, title: string, content: string }[]>([]);
+  const [exercises, setExercises] = useState<string[]>([]);
+  const [newExercise, setNewExercise] = useState('');
+  const [currentObjective, setCurrentObjective] = useState('');
+
+  // Selection UI State
+  const [showAdvancedChord, setShowAdvancedChord] = useState(false);
+  const [selRoot, setSelRoot] = useState('C');
+  const [selType, setSelType] = useState('maj');
+  const [selExt, setSelExt] = useState('none');
+  const [selScaleRoot, setSelScaleRoot] = useState('C');
+  const [selScaleId, setSelScaleId] = useState('major');
+
+  const [isPreviewing, setIsPreviewing] = useState(false);
+
+  useEffect(() => {
+    const savedStudents = localStorage.getItem('music_students');
+    if (savedStudents) setStudents(JSON.parse(savedStudents));
+
+    const savedTeachers = localStorage.getItem('music_teachers');
+    if (savedTeachers) {
+      setTeachers(JSON.parse(savedTeachers));
+    } else {
+      const defaultTeachers: Teacher[] = [
+        { id: '1', name: 'Professor Bruno', password: '123' },
+        { id: '2', name: 'Professor Ana', password: '123' },
+        { id: 'director', name: 'Diretor', password: 'admin' }
+      ];
+      setTeachers(defaultTeachers);
+      localStorage.setItem('music_teachers', JSON.stringify(defaultTeachers));
+    }
+
+    const savedUser = localStorage.getItem('music_current_user');
+    if (savedUser) setCurrentUser(JSON.parse(savedUser));
+  }, []);
+
+  const saveStudents = (newStudents: Student[]) => {
+    setStudents(newStudents);
+    localStorage.setItem('music_students', JSON.stringify(newStudents));
+  };
+
+  const handleLogin = (user: Teacher) => {
+    setCurrentUser(user);
+    localStorage.setItem('music_current_user', JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('music_current_user');
+    setSelectedStudent(null);
+  };
+
+  const addStudent = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    const formData = new FormData(e.currentTarget);
+    const newStudent: Student = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: formData.get('name') as string,
+      instrument: formData.get('instrument') as Instrument,
+      level: formData.get('level') as Level,
+      teacherId: currentUser.id,
+      createdAt: Date.now()
+    };
+    saveStudents([...students, newStudent]);
+    setIsAddingStudent(false);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      const newStudentsFromCsv: Student[] = [];
+
+      lines.forEach((line, index) => {
+        if (index === 0 || !line.trim()) return;
+        const parts = line.split(',');
+        if (parts.length < 2) return;
+
+        const fullName = parts[0].trim();
+        const instrumentName = parts[1].trim();
+
+        let instrument = Instrument.GUITAR;
+        if (instrumentName.toLowerCase().includes('guitar')) instrument = Instrument.ELECTRIC_GUITAR;
+        if (instrumentName.toLowerCase().includes('teclado')) instrument = Instrument.KEYBOARD;
+        if (instrumentName.toLowerCase().includes('piano')) instrument = Instrument.PIANO;
+        if (instrumentName.toLowerCase().includes('bateria')) instrument = Instrument.DRUMS;
+
+        const exists = students.some(s => s.name.toLowerCase() === fullName.toLowerCase());
+
+        if (!exists) {
+          newStudentsFromCsv.push({
+            id: Math.random().toString(36).substr(2, 9),
+            name: fullName,
+            instrument,
+            level: Level.BEGINNER,
+            teacherId: currentUser.id,
+            createdAt: Date.now()
+          });
+        }
+      });
+
+      if (newStudentsFromCsv.length > 0) {
+        saveStudents([...students, ...newStudentsFromCsv]);
+        alert(`${newStudentsFromCsv.length} novos alunos importados com sucesso!`);
+      } else {
+        alert("Nenhum novo aluno encontrado na planilha.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Handlers for Lesson Content
+  const handleAddChord = () => {
+    const chord = MusicEngine.generateChord(selRoot, selType, selExt);
+    if (chord) setCurrentChords([...currentChords, { ...chord, typeId: selType, extId: selExt }]);
+  };
+
+  const handleAddScale = () => {
+    const notes = MusicEngine.generateScale(selScaleRoot, selScaleId);
+    const scale = SCALES.find(s => s.id === selScaleId);
+    if (notes && scale) {
+      setCurrentScales([...currentScales, { root: selScaleRoot, name: scale.name, notes }]);
+    }
+  };
+
+  const handleAddTab = () => {
+    setCurrentTabs([...currentTabs, { id: Math.random().toString(), title: '', content: '' }]);
+  };
+
+  const updateTab = (id: string, title: string, content: string) => {
+    setCurrentTabs(currentTabs.map(t => t.id === id ? { ...t, title, content } : t));
+  };
+
+  const removeTab = (id: string) => {
+    setCurrentTabs(currentTabs.filter(t => t.id !== id));
+  };
+
+  const handleAddExercise = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && newExercise.trim()) {
+      setExercises([...exercises, newExercise.trim()]);
+      setNewExercise('');
+    }
+  };
+
+  const teacherStudents = students.filter(s => s.teacherId === currentUser?.id);
+
+  if (!currentUser) {
+    return <Login teachers={teachers} onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-x-hidden">
+      <nav className="w-full md:w-20 lg:w-72 bg-[#1A110D] text-white p-4 lg:p-8 flex md:flex-col items-center lg:items-stretch sticky top-0 z-50 h-auto md:h-screen shadow-2xl overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -mr-16 -mt-16" />
+        <div className="flex items-center gap-3 mb-0 md:mb-12 mr-auto md:mr-0 z-10">
+          <div className="w-10 h-10 bg-[#E87A2C] rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20"><Music className="w-6 h-6 text-white" /></div>
+          <h1 className="text-xl font-black tracking-tighter lg:block md:hidden">MUSICLASS</h1>
+        </div>
+        <div className="flex md:flex-col gap-2 flex-grow justify-center md:justify-start w-full z-10">
+          <button onClick={() => setActiveTab('students')} className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'students' ? 'bg-[#E87A2C] shadow-xl shadow-orange-500/10' : 'text-stone-500 hover:bg-white/5 hover:text-white'}`}>
+            <Users className="w-5 h-5" /><span className="lg:block md:hidden text-[10px] font-black uppercase tracking-widest">Alunos</span>
+          </button>
+          <button onClick={() => { if (selectedStudent) setActiveTab('lesson'); else alert('Selecione um aluno primeiro!'); }} className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${activeTab === 'lesson' ? 'bg-[#E87A2C] shadow-xl shadow-orange-500/10' : 'text-stone-500 hover:bg-white/5 hover:text-white'}`}>
+            <BookOpen className="w-5 h-5" /><span className="lg:block md:hidden text-[10px] font-black uppercase tracking-widest">Nova Aula</span>
+          </button>
+        </div>
+        <div className="mt-auto pt-6 border-t border-white/5 w-full z-10">
+          <div className="lg:flex items-center gap-4 px-5 py-3 hidden">
+            <div className="w-8 h-8 bg-stone-800 rounded-lg flex items-center justify-center text-[10px] font-black">{currentUser.name.charAt(0)}</div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black truncate">{currentUser.name}</span>
+              <button onClick={handleLogout} className="text-[8px] font-bold text-orange-400 uppercase tracking-widest flex items-center gap-1 hover:text-white transition-colors">Sair <LogOut className="w-2 h-2" /></button>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="lg:hidden p-4 text-stone-500 hover:text-white transition-colors"><LogOut className="w-5 h-5" /></button>
+        </div>
+      </nav>
+
+      <main className="flex-grow p-4 md:p-12 overflow-y-auto">
+        {activeTab === 'students' && (
+          <div className="max-w-6xl mx-auto animate-fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Meus Alunos</h2>
+                <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Gerencie sua agenda de aulas</p>
+              </div>
+              <div className="flex gap-4 w-full md:w-auto">
+                <label className="flex-grow md:flex-none cursor-pointer bg-white border border-[#3C2415]/10 px-6 py-4 rounded-3xl flex items-center gap-3 shadow-sm hover:shadow-xl hover:border-[#E87A2C]/20 transition-all font-black text-xs uppercase tracking-widest text-[#3C2415]/60">
+                  <Upload className="w-4 h-4 text-[#E87A2C]" /> Subir Planilha
+                  <input type="file" onChange={handleFileUpload} accept=".csv" className="hidden" />
+                </label>
+                <button onClick={() => setIsAddingStudent(true)} className="bg-[#1A110D] text-white px-8 py-4 rounded-3xl flex items-center gap-3 shadow-xl hover:bg-[#3C2415] transition-all font-black text-xs uppercase tracking-widest">
+                  <Plus className="w-4 h-4" /> Novo Aluno
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {teacherStudents.map(student => (
+                <div key={student.id} onClick={() => { setSelectedStudent(student); setActiveTab('lesson'); }} className="group bg-white p-8 rounded-[48px] border border-[#3C2415]/5 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#E87A2C]/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700" />
+                  <div className="w-16 h-16 bg-[#FBF6F0] rounded-[24px] flex items-center justify-center text-[#E87A2C] text-2xl font-black mb-6 group-hover:bg-[#E87A2C] group-hover:text-white transition-all duration-500">{student.name.charAt(0)}</div>
+                  <h4 className="font-black text-[#3C2415] text-2xl tracking-tighter uppercase mb-1">{student.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-[#1A110D] text-white rounded-full">{student.instrument}</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-white border border-[#3C2415]/10 text-[#3C2415] rounded-full">{student.level}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'lesson' && selectedStudent && (
+          <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-32">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                <button onClick={() => setActiveTab('students')} className="text-[#3C2415]/40 hover:text-[#E87A2C] text-[10px] font-black uppercase tracking-widest mb-2 transition-colors">← Voltar aos alunos</button>
+                <h2 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Roteiro para {selectedStudent.name}</h2>
+              </div>
+              <div className="bg-[#1A110D] px-6 py-3 rounded-2xl flex items-center gap-4 shadow-xl">
+                <div className="w-8 h-8 bg-[#E87A2C] rounded-lg flex items-center justify-center font-black text-white">{selectedStudent.name.charAt(0)}</div>
+                <p className="text-sm font-black text-white uppercase tracking-widest">{selectedStudent.instrument}</p>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              <div className="lg:col-span-8 space-y-10">
+                <section className="bg-white rounded-[48px] p-8 border border-[#3C2415]/5 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Music className="text-[#E87A2C]" /> Harmonias</h3>
+                    <button onClick={() => setShowAdvancedChord(!showAdvancedChord)} className="p-2 bg-[#FBF6F0] rounded-xl"><Settings2 className="w-5 h-5 text-[#3C2415]/20 hover:text-[#E87A2C] transition-colors" /></button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-8">
+                    {ROOTS.filter(r => showAdvancedChord || (!r.includes('#') && !r.includes('b'))).map(r => (
+                      <button key={r} onClick={() => setSelRoot(r)} className={`px-5 py-3 rounded-xl font-black text-sm transition-all ${selRoot === r ? 'bg-[#E87A2C] text-white shadow-lg scale-105' : 'bg-[#FBF6F0] text-[#3C2415]/40 hover:bg-stone-100'}`}>{r}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-10">
+                    {CHORD_TYPES.filter(t => showAdvancedChord || (t.id === 'maj' || t.id === 'min')).map(t => (
+                      <button key={t.id} onClick={() => setSelType(t.id)} className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${selType === t.id ? 'bg-[#1A110D] text-white' : 'bg-[#FBF6F0] text-[#3C2415]/30'}`}>{t.name}</button>
+                    ))}
+                  </div>
+                  <button onClick={handleAddChord} className="w-full bg-[#E87A2C] text-white py-6 rounded-[32px] font-black text-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/10"><Zap className="w-5 h-5" /> ADICIONAR ACORDE {selRoot}{selType !== 'maj' ? selType : ''}</button>
+                  {currentChords.length > 0 && (
+                    <div className="mt-12 flex flex-wrap gap-4">
+                      {currentChords.map((c, i) => (
+                        <div key={i} className="relative group p-2 bg-[#FBF6F0] rounded-[32px] border border-[#3C2415]/5">
+                          <ChordVisualizer instrument={selectedStudent.instrument} chordNotes={c.notes} root={c.root} type={c.typeId} ext={c.extId} />
+                          <button onClick={() => setCurrentChords(currentChords.filter((_, idx) => idx !== i))} className="absolute -top-3 -right-3 bg-[#1A110D] text-white p-2.5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="bg-white rounded-[48px] p-8 border border-[#3C2415]/5 shadow-sm">
+                  <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3 mb-8"><Layout className="text-[#E87A2C]" /> Campo Harmônico / Escalas</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="flex flex-wrap gap-2">
+                      {ROOTS.filter(r => !r.includes('#') && !r.includes('b')).map(r => (
+                        <button key={r} onClick={() => setSelScaleRoot(r)} className={`w-10 h-10 rounded-xl font-black ${selScaleRoot === r ? 'bg-[#E87A2C] text-white shadow-lg' : 'bg-[#FBF6F0] text-[#3C2415]/40'}`}>{r}</button>
+                      ))}
+                    </div>
+                    <select value={selScaleId} onChange={(e) => setSelScaleId(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-2xl px-6 py-3 font-bold text-[#3C2415]">
+                      {SCALES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleAddScale} className="w-full bg-[#1A110D] text-white py-5 rounded-3xl font-black flex items-center justify-center gap-3 hover:bg-[#3C2415] mb-8">ADICIONAR ESCALA</button>
+                  {currentScales.map((s, i) => (
+                    <div key={i} className="bg-[#FBF6F0] p-4 rounded-2xl flex justify-between items-center mb-2">
+                      <span className="font-bold text-sm tracking-tight">{s.root} {s.name}</span>
+                      <button onClick={() => setCurrentScales(currentScales.filter((_, idx) => idx !== i))} className="text-rose-500"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </section>
+
+                <section className="space-y-6">
+                  {currentTabs.map(tab => (
+                    <div key={tab.id} className="relative">
+                      <TabEditor title={tab.title} onTitleChange={(t) => updateTab(tab.id, t, tab.content)} value={tab.content} onChange={(c) => updateTab(tab.id, tab.title, c)} />
+                      <button onClick={() => removeTab(tab.id)} className="absolute top-6 right-6 text-rose-500 hover:text-rose-700"><Trash2 className="w-5 h-5" /></button>
+                    </div>
+                  ))}
+                  <button onClick={handleAddTab} className="w-full py-8 border-2 border-dashed border-[#E87A2C]/30 rounded-[48px] text-[#E87A2C] font-black flex items-center justify-center gap-3 hover:bg-orange-50 transition-all">
+                    <PlusCircle className="w-6 h-6" /> ADICIONAR TABLATURA / RIFF
+                  </button>
+                </section>
+              </div>
+
+              <div className="lg:col-span-4 space-y-8">
+                <section className="bg-white p-10 rounded-[48px] border border-[#3C2415]/5 shadow-sm sticky top-12">
+                  <div className="space-y-10">
+                    <div>
+                      <h3 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-4 flex items-center gap-2">Pauta Pedagógica</h3>
+                      <textarea value={currentObjective} onChange={(e) => setCurrentObjective(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-[32px] p-6 h-40 text-sm font-medium focus:ring-2 focus:ring-[#E87A2C]" placeholder="Roteiro da semana..." />
+                    </div>
+                    <div>
+                      <h3 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-4 flex items-center gap-2">Exercícios Extras</h3>
+                      <div className="space-y-2">
+                        {exercises.map((ex, i) => (
+                          <div key={i} className="flex justify-between items-center bg-[#FBF6F0] px-4 py-2 rounded-xl text-xs font-bold">
+                            {ex} <button onClick={() => setExercises(exercises.filter((_, idx) => idx !== i))} className="text-rose-500"><X className="w-4 h-4" /></button>
+                          </div>
+                        ))}
+                        <input value={newExercise} onChange={(e) => setNewExercise(e.target.value)} onKeyDown={handleAddExercise} className="w-full bg-[#FBF6F0] border-none rounded-xl px-4 py-3 text-xs" placeholder="Novo exercício + Enter" />
+                      </div>
+                    </div>
+                    <button onClick={() => setIsPreviewing(true)} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-[#3C2415] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-stone-950/20"><Sparkles className="w-4 h-4" /> GERAR IMAGEM PNG</button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {isPreviewing && selectedStudent && (
+        <StudentPreview studentName={selectedStudent.name} instrument={selectedStudent.instrument} objective={currentObjective} chords={currentChords} scales={currentScales} exercises={exercises} tabs={currentTabs} onClose={() => setIsPreviewing(false)} />
+      )}
+
+      {isAddingStudent && (
+        <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[100] p-6">
+          <div className="bg-white rounded-[64px] p-12 w-full max-w-xl shadow-2xl relative overflow-hidden animate-fade-in">
+            <h3 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase mb-2">Novo Aluno</h3>
+            <form onSubmit={addStudent} className="space-y-6">
+              <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Nome do Aluno" />
+              <div className="grid grid-cols-2 gap-6">
+                <select name="instrument" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Instrument).map(i => <option key={i} value={i}>{i}</option>)}</select>
+                <select name="level" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Level).map(l => <option key={l} value={l}>{l}</option>)}</select>
+              </div>
+              <button type="submit" className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-lg shadow-xl hover:bg-[#3C2415] transition-all">FINALIZAR CADASTRO</button>
+              <button type="button" onClick={() => setIsAddingStudent(false)} className="w-full text-[#3C2415]/30 font-bold uppercase text-[10px] tracking-widest mt-4">Dispensar</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;

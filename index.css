@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --orange: #E87A2C;
+  --brown: #3C2415;
+  --cream: #FBF6F0;
+  --black: #1A110D;
+  --soft-brown: #5C4033;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--black);
+  font-family: 'Inter', sans-serif;
+}
+
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+
+  /* Reset layout for single page focus */
+  html,
+  body {
+    height: auto;
+    font-size: 11pt !important;
+    background: white !important;
+  }
+
+  /* Force everything to fit */
+  .fixed,
+  header.sticky,
+  .print-hidden,
+  button {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    background: transparent !important;
+  }
+
+  /* Compact spacing for print */
+  .space-y-24,
+  .space-y-20,
+  .space-y-16 {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
+    display: block !important;
+  }
+
+  .p-8,
+  .p-12,
+  .p-16 {
+    padding: 0.5rem !important;
+  }
+
+  .my-10,
+  .my-4 {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Scale diagrams down for print */
+  .print\:scale-\[0\.55\] {
+    transform: scale(0.55) !important;
+    transform-origin: top center !important;
+    margin: -3rem 0 !important;
+  }
+
+  /* Typography overhaul for PDF */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.2rem !important;
+  }
+
+  h3 {
+    font-size: 1rem !important;
+  }
+
+  p,
+  pre,
+  span {
+    font-size: 9pt !important;
+  }
+
+  .break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  .grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cream);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--orange);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--soft-brown);
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Keyboard Styling Overrides */
+.piano-key-white {
+  background: white;
+  border: 1px solid #ddd;
+  border-bottom: 4px solid #eee;
+  border-radius: 0 0 4px 4px;
+}
+
+.piano-key-black {
+  background: #111;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 3px 0 #000;
+}
