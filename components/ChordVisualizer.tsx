@@ -11,13 +11,16 @@ interface Props {
   root: string;
   type?: string;
   ext?: string;
+  bass?: string;
   notesWithIndices?: any[];
+  isCustom?: boolean;
   isFullscreen?: boolean;
 }
 
-export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root, type = 'maj', ext = '', notesWithIndices, isFullscreen }) => {
+
+export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root, type = 'maj', ext = '', bass, notesWithIndices, isCustom, isFullscreen }) => {
   if (instrument === Instrument.KEYBOARD || instrument === Instrument.PIANO || instrument === Instrument.VOCALS) {
-    return <KeyboardVisualizer chordNotes={chordNotes} root={root} type={type} ext={ext} notesWithIndices={notesWithIndices} />;
+    return <KeyboardVisualizer chordNotes={chordNotes} root={root} type={type} ext={ext} bass={bass} notesWithIndices={notesWithIndices} isCustom={isCustom} />;
   }
 
   if (instrument === Instrument.DRUMS) {
@@ -25,30 +28,45 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
   }
 
   // Guitar/Bass Logic
-  const shape = getGuitarShape(root, type, ext);
+  let shape: any;
+  if (isCustom && notesWithIndices) {
+    // Reconstruct shape from custom data
+    const frets: (number | null)[] = [null, null, null, null, null, null];
+    const fingers: number[] = [0, 0, 0, 0, 0, 0];
+    for (let j = 0; j < notesWithIndices.length; j += 3) {
+      const s = notesWithIndices[j] - 1;
+      const f = notesWithIndices[j + 1];
+      const fin = notesWithIndices[j + 2];
+      frets[s] = f;
+      fingers[s] = fin;
+    }
+    shape = { frets, fingers, barre: null };
+  } else {
+    shape = getGuitarShape(root, type, ext);
+  }
 
-  const nonNullFrets = shape.frets.filter(f => f !== null && f > 0) as number[];
+  const nonNullFrets = shape.frets.filter((f: any) => f !== null && f > 0) as number[];
   const minFret = nonNullFrets.length > 0 ? Math.min(...nonNullFrets) : 0;
   const startFret = minFret > 4 ? minFret : 1;
 
   const displayType = type === 'min' ? 'm' : (type === 'maj' ? '' : type);
   const displayExt = ext === 'none' ? '' : (ext === '7' ? '7' : ext);
-  const fullChordName = `${root}${displayType}${displayExt}`;
+  const displayBass = bass && bass !== 'none' ? `/${bass}` : '';
+  const fullChordName = isCustom ? root : `${root}${displayType}${displayExt}${displayBass}`;
 
   return (
     <div className={`flex flex-col bg-white border border-stone-200 rounded-xl overflow-hidden shadow-md group transition-all duration-300 w-full ${isFullscreen ? 'max-w-[400px]' : 'max-w-[260px] mx-auto'}`}>
-      {/* Chord Header - Matching Keyboard Premium Style */}
       <div className="bg-[#1A110D] py-1.5 px-3 flex justify-between items-center border-b border-black">
         <h5 className="text-base font-black text-[#E87A2C] tracking-tighter uppercase leading-none truncate max-w-[65%]">{fullChordName}</h5>
         <div className="flex gap-1 shrink-0">
-          {chordNotes.slice(0, 3).map((n, i) => (
+          {!isCustom && chordNotes.slice(0, 3).map((n, i) => (
             <span key={i} className="text-[7px] font-bold text-white/40 uppercase bg-white/5 px-1 rounded">{n}</span>
           ))}
         </div>
       </div>
 
       <div className="p-4 bg-stone-50 flex flex-col items-center">
-        <p className="text-[#E87A2C] font-black uppercase tracking-[0.2em] text-[7px] mb-3 opacity-50">{instrument} Diagram</p>
+        <p className="text-[#E87A2C] font-black uppercase tracking-[0.2em] text-[7px] mb-3 opacity-50">{instrument} {isCustom ? 'Custom' : 'Diagram'}</p>
 
         <div className={`relative ${isFullscreen ? 'w-64 h-[320px]' : 'w-28 h-40'} bg-white border-x-[3px] border-b-[3px] border-[#3C2415]/80 rounded-b-lg shadow-xl mt-1 relative z-10`}>
           {/* Top Nut or Fret Label */}
@@ -58,17 +76,14 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
             <div className="absolute top-0 w-full h-3 bg-[#1A110D] -mt-1.5 rounded-sm z-20 shadow-md" />
           )}
 
-          {/* Fret Lines */}
           {[1, 2, 3, 4, 5].map(f => (
             <div key={f} className="absolute w-full h-[2px] bg-stone-200" style={{ top: `${f * 20}%` }} />
           ))}
 
-          {/* String Lines */}
           {[0, 1, 2, 3, 4, 5].map(s => (
             <div key={s} className="absolute h-full w-[1px] bg-stone-300" style={{ left: `${s * 20}%` }} />
           ))}
 
-          {/* Barre Circle */}
           {shape.barre && (
             <div
               className="absolute bg-[#1A110D]/90 rounded-full border border-black z-10 shadow-lg"
@@ -85,8 +100,7 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
             </div>
           )}
 
-          {/* Notes / Fingers */}
-          {shape.frets.map((fret, stringIndex) => {
+          {shape.frets.map((fret: any, stringIndex: number) => {
             if (fret === null) {
               return (
                 <div key={stringIndex} className="absolute -top-7 text-rose-500 font-black text-sm" style={{ left: `${stringIndex * 20}%`, transform: 'translateX(-50%)' }}>
@@ -114,7 +128,7 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
                   left: `${stringIndex * 20}%`
                 }}
               >
-                {finger}
+                {finger || ''}
               </div>
             );
           })}

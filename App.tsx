@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   BookOpen,
@@ -21,6 +21,9 @@ import {
   Trash,
   Keyboard,
   ListTodo,
+  History as HistoryIcon,
+  Clock,
+  MousePointer2,
   Disc
 } from 'lucide-react';
 
@@ -35,7 +38,7 @@ import { Login } from './components/Login';
 import { SoloEditor } from './components/SoloEditor';
 import { Logo } from './components/Logo';
 import { supabase } from './lib/supabase';
-import { History as HistoryIcon, Clock } from 'lucide-react';
+import { ManualChordEditor } from './components/ManualChordEditor';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Teacher | null>(null);
@@ -56,6 +59,14 @@ const App: React.FC = () => {
   const [currentObjective, setCurrentObjective] = useState('');
   const [lessonHistory, setLessonHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isManualChordOpen, setIsManualChordOpen] = useState(false);
+  const [selBass, setSelBass] = useState('none');
+
+  // Audio Recording State for Vocal
+  const [recordings, setRecordings] = useState<{ id: string, title: string, blob: Blob | null, url: string }[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const audioChunks = useRef<Blob[]>([]);
 
   // Selection UI State
   const [showAdvancedChord, setShowAdvancedChord] = useState(false);
@@ -309,10 +320,122 @@ const App: React.FC = () => {
 
   const handleAddChord = () => {
     const chord = MusicEngine.generateChord(selRoot, selType, selExt);
-    if (chord) setCurrentChords([...currentChords, { ...chord, typeId: selType, extId: selExt, root: selRoot }]);
+    if (chord) {
+      setCurrentChords([...currentChords, {
+        ...chord,
+        typeId: selType,
+        extId: selExt,
+        root: selRoot,
+        bass: selBass === 'none' ? undefined : selBass
+      }]);
+    }
+  };
+
+  const saveManualChord = (name: string, notes: number[], isCustom: boolean) => {
+    setCurrentChords([...currentChords, {
+      root: name,
+      notes: [],
+      notesWithIndices: notes,
+      typeId: '',
+      extId: '',
+      isCustom
+    }]);
+  };
+
+  const handleSelectStudent = (student: Student) => {
+    if (selectedStudent?.id !== student.id) {
+      // Reset current lesson state for the new student
+      setCurrentChords([]);
+      setCurrentScales([]);
+      setCurrentTabs([]);
+      setCurrentSolos([]);
+      setExercises([]);
+      setCurrentObjective('');
+      setRecordings([]);
+    }
+    setSelectedStudent(student);
+    setActiveTab('lesson');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Seu navegador não suporta gravação de áudio ou o acesso foi negado.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      audioChunks.current = [];
+
+      mediaRecorder.current.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.current.push(e.data);
+      };
+
+      mediaRecorder.current.onstop = () => {
+        const blob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        const newRecording = {
+          id: Math.random().toString(36).substr(2, 9),
+          title: `Guia Vocal ${recordings.length + 1}`,
+          blob,
+          url
+        };
+        setRecordings(prev => [...prev, newRecording]);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Erro ao acessar microfone:", err);
+      alert("Não foi possível acessar o microfone. Verifique as permissões.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
   };
 
   const handleGenerateReport = async () => {
+    if (!selectedStudent || !currentUser) return;
+
+    // Upload all recorded blobs that don't have a public URL yet (blobs from local recording session)
+    const needsUpload = recordings.filter(r => r.blob !== null);
+
+    if (needsUpload.length > 0) {
+      setLoading(true);
+      const updatedRecordings = [...recordings];
+
+      for (let i = 0; i < updatedRecordings.length; i++) {
+        const rec = updatedRecordings[i];
+        if (rec.blob) {
+          const fileName = `guide-${selectedStudent.id}-${Date.now()}-${rec.id}.webm`;
+          const { data, error } = await supabase.storage
+            .from('lesson-audios')
+            .upload(fileName, rec.blob);
+
+          if (!error && data) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('lesson-audios')
+              .getPublicUrl(fileName);
+
+            updatedRecordings[i] = { ...rec, url: publicUrl, blob: null };
+          }
+        }
+      }
+
+      setRecordings(updatedRecordings);
+      setLoading(false);
+    }
+
+    setIsPreviewing(true);
+  };
+
+  const handleExportSuccess = async () => {
     if (!selectedStudent || !currentUser) return;
 
     const reportData = {
@@ -320,7 +443,8 @@ const App: React.FC = () => {
       scales: currentScales,
       tabs: currentTabs,
       solos: currentSolos,
-      exercises: exercises
+      exercises: exercises,
+      recordings: recordings.map(r => ({ id: r.id, title: r.title, url: r.url }))
     };
 
     const { error } = await supabase.from('mc_lesson_history').insert([{
@@ -331,9 +455,7 @@ const App: React.FC = () => {
     }]);
 
     if (error) console.error("Erro ao salvar histórico:", error);
-
     await fetchInitialData();
-    setIsPreviewing(true);
   };
 
   const handleAddScale = () => {
@@ -461,7 +583,7 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
               {teacherStudents.map(student => (
-                <div key={student.id} onClick={() => { setSelectedStudent(student); setActiveTab('lesson'); }} className="group bg-white p-8 rounded-[48px] border border-[#3C2415]/5 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer relative overflow-hidden">
+                <div key={student.id} onClick={() => handleSelectStudent(student)} className="group bg-white p-8 rounded-[48px] border border-[#3C2415]/5 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[#E87A2C]/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700" />
                   <div className="w-16 h-16 bg-[#FBF6F0] rounded-[24px] flex items-center justify-center text-[#E87A2C] text-2xl font-black mb-6 group-hover:bg-[#E87A2C] group-hover:text-white transition-all duration-500">{student.name.charAt(0)}</div>
                   <h4 className="font-black text-[#3C2415] text-2xl tracking-tighter uppercase mb-1">{student.name}</h4>
@@ -494,66 +616,95 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-8 space-y-12">
                 {/* Harmonias */}
-                <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
-                  <div className="flex items-center justify-between mb-10">
-                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Zap className="text-[#E87A2C]" /> Harmonias e Acordes</h3>
-                    <button onClick={() => setShowAdvancedChord(!showAdvancedChord)} className="p-3 bg-[#FBF6F0] rounded-2xl text-[#3C2415]/40 hover:text-[#E87A2C] transition-all flex items-center gap-2 text-[10px] font-black uppercase"><Settings2 className="w-4 h-4" /> Avançado</button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    {ROOTS.filter(r => showAdvancedChord || (!r.includes('#') && !r.includes('b'))).map(r => (
-                      <button key={r} onClick={() => setSelRoot(r)} className={`px-5 py-3 rounded-xl font-black text-sm transition-all ${selRoot === r ? 'bg-[#E87A2C] text-white shadow-lg scale-110' : 'bg-[#FBF6F0] text-[#3C2415]/40 hover:bg-stone-100'}`}>{r}</button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-10">
-                    {CHORD_TYPES.filter(t => showAdvancedChord || (t.id === 'maj' || t.id === 'min')).map(t => (
-                      <button key={t.id} onClick={() => setSelType(t.id)} className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${selType === t.id ? 'bg-[#1A110D] text-white' : 'bg-[#FBF6F0] text-[#3C2415]/30'}`}>{t.name}</button>
-                    ))}
-                  </div>
-                  <button onClick={handleAddChord} className="w-full bg-[#E87A2C] text-white py-6 rounded-[32px] font-black text-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/10">ADICIONAR ACORDE {selRoot}{selType !== 'maj' ? selType : ''}</button>
-
-                  {currentChords.length > 0 && (
-                    <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {currentChords.map((c, i) => (
-                        <div key={i} className="relative group">
-                          <ChordVisualizer instrument={selectedStudent.instrument} chordNotes={c.notes} root={c.root} type={c.typeId} ext={c.extId} notesWithIndices={c.notesWithIndices} />
-                          <button onClick={() => setCurrentChords(currentChords.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 bg-[#1A110D] text-white p-3 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
-                        </div>
+                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                  <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
+                    <div className="flex items-center justify-between mb-10">
+                      <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Zap className="text-[#E87A2C]" /> Harmonias e Acordes</h3>
+                      <button onClick={() => setShowAdvancedChord(!showAdvancedChord)} className="p-3 bg-[#FBF6F0] rounded-2xl text-[#3C2415]/40 hover:text-[#E87A2C] transition-all flex items-center gap-2 text-[10px] font-black uppercase"><Settings2 className="w-4 h-4" /> Avançado</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-8">
+                      {ROOTS.filter(r => showAdvancedChord || (!r.includes('#') && !r.includes('b'))).map(r => (
+                        <button key={r} onClick={() => setSelRoot(r)} className={`px-5 py-3 rounded-xl font-black text-sm transition-all ${selRoot === r ? 'bg-[#E87A2C] text-white shadow-lg scale-110' : 'bg-[#FBF6F0] text-[#3C2415]/40 hover:bg-stone-100'}`}>{r}</button>
                       ))}
                     </div>
-                  )}
-                </section>
-
-                {/* Escalas */}
-                <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
-                  <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3 mb-10"><Layout className="text-[#E87A2C]" /> Campo Harmônico / Escalas</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                    <div className="flex flex-wrap gap-2">
-                      {ROOTS.filter(r => !r.includes('#') && !r.includes('b')).map(r => (
-                        <button key={r} onClick={() => setSelScaleRoot(r)} className={`w-12 h-12 rounded-2xl font-black ${selScaleRoot === r ? 'bg-[#E87A2C] text-white shadow-lg scale-110' : 'bg-[#FBF6F0] text-[#3C2415]/40'}`}>{r}</button>
+                    <div className="flex flex-wrap gap-2 mb-10">
+                      {CHORD_TYPES.filter(t => showAdvancedChord || (t.id === 'maj' || t.id === 'min')).map(t => (
+                        <button key={t.id} onClick={() => setSelType(t.id)} className={`px-6 py-3 rounded-xl font-black text-xs transition-all ${selType === t.id ? 'bg-[#1A110D] text-white' : 'bg-[#FBF6F0] text-[#3C2415]/30'}`}>{t.name}</button>
                       ))}
                     </div>
-                    <select value={selScaleId} onChange={(e) => setSelScaleId(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-2xl px-8 py-4 font-bold text-[#3C2415] focus:ring-2 focus:ring-orange-500">
-                      {SCALES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <button onClick={handleAddScale} className="w-full bg-[#1A110D] text-white py-6 rounded-3xl font-black text-lg hover:bg-[#3C2415] mb-10">ADICIONAR ESCALA</button>
 
-                  <div className="space-y-4">
-                    {currentScales.map((s, i) => (
-                      <div key={i} className="bg-[#FBF6F0] p-6 rounded-3xl border border-[#3C2415]/5">
-                        <div className="flex justify-between items-center mb-4">
-                          <span className="font-black text-lg uppercase tracking-tight">{s.root} {s.name}</span>
-                          <button onClick={() => setCurrentScales(currentScales.filter((_, idx) => idx !== i))} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
-                        </div>
+                    {showAdvancedChord && (
+                      <div className="mb-10 p-6 bg-stone-50 rounded-3xl border border-stone-100">
+                        <h4 className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-4">Selecione o Baixo (Opcional)</h4>
                         <div className="flex flex-wrap gap-2">
-                          {s.notes.map((n: string, ni: number) => (
-                            <span key={ni} className="w-10 h-10 bg-white border border-[#3C2415]/10 rounded-xl flex items-center justify-center font-black text-[#3C2415] text-xs shadow-sm">{n}</span>
+                          <button onClick={() => setSelBass('none')} className={`px-4 py-2 rounded-xl font-black text-[10px] ${selBass === 'none' ? 'bg-[#1A110D] text-white' : 'bg-white text-stone-300'}`}>Padrão</button>
+                          {ROOTS.map(r => (
+                            <button key={r} onClick={() => setSelBass(r)} className={`px-4 py-2 rounded-xl font-black text-[10px] transition-all ${selBass === r ? 'bg-[#E87A2C] text-white' : 'bg-white text-stone-300'}`}>{r}</button>
                           ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </section>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <button onClick={handleAddChord} className="w-full bg-[#E87A2C] text-white py-6 rounded-[32px] font-black text-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/10">ADICIONAR ACORDE {selRoot}{selType !== 'maj' ? selType : ''}{selBass !== 'none' ? `/${selBass}` : ''}</button>
+                      <button onClick={() => setIsManualChordOpen(true)} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-stone-800 transition-all flex items-center justify-center gap-3 shadow-lg"><MousePointer2 className="w-4 h-4" /> Criar Manualmente</button>
+                    </div>
+
+                    {currentChords.length > 0 && (
+                      <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {currentChords.map((c, i) => (
+                          <div key={i} className="relative group">
+                            <ChordVisualizer
+                              instrument={selectedStudent.instrument}
+                              chordNotes={c.notes}
+                              root={c.root}
+                              type={c.typeId}
+                              ext={c.extId}
+                              bass={c.bass}
+                              notesWithIndices={c.notesWithIndices}
+                              isCustom={c.isCustom}
+                            />
+                            <button onClick={() => setCurrentChords(currentChords.filter((_, idx) => idx !== i))} className="absolute top-4 right-4 bg-[#1A110D] text-white p-3 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* Escalas */}
+                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                  <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
+                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3 mb-10"><Layout className="text-[#E87A2C]" /> Campo Harmônico / Escalas</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                      <div className="flex flex-wrap gap-2">
+                        {ROOTS.filter(r => !r.includes('#') && !r.includes('b')).map(r => (
+                          <button key={r} onClick={() => setSelScaleRoot(r)} className={`w-12 h-12 rounded-2xl font-black ${selScaleRoot === r ? 'bg-[#E87A2C] text-white shadow-lg scale-110' : 'bg-[#FBF6F0] text-[#3C2415]/40'}`}>{r}</button>
+                        ))}
+                      </div>
+                      <select value={selScaleId} onChange={(e) => setSelScaleId(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-2xl px-8 py-4 font-bold text-[#3C2415] focus:ring-2 focus:ring-orange-500">
+                        {SCALES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                    <button onClick={handleAddScale} className="w-full bg-[#1A110D] text-white py-6 rounded-3xl font-black text-lg hover:bg-[#3C2415] mb-10">ADICIONAR ESCALA</button>
+
+                    <div className="space-y-4">
+                      {currentScales.map((s, i) => (
+                        <div key={i} className="bg-[#FBF6F0] p-6 rounded-3xl border border-[#3C2415]/5">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="font-black text-lg uppercase tracking-tight">{s.root} {s.name}</span>
+                            <button onClick={() => setCurrentScales(currentScales.filter((_, idx) => idx !== i))} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {s.notes.map((n: string, ni: number) => (
+                              <span key={ni} className="w-10 h-10 bg-white border border-[#3C2415]/10 rounded-xl flex items-center justify-center font-black text-[#3C2415] text-xs shadow-sm">{n}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {/* Exercícios */}
                 <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
@@ -583,29 +734,31 @@ const App: React.FC = () => {
                 </section>
 
                 {/* Ditador de Solos Dinâmico */}
-                <section className="space-y-8">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Music className="text-[#E87A2C]" /> Ditador de Melodias</h3>
-                    <button onClick={handleAddSolo} className="px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-[#3C2415] transition-all"><Plus className="w-4 h-4" /> Novo Trecho</button>
-                  </div>
-                  {currentSolos.map(solo => (
-                    <SoloEditor
-                      key={solo.id}
-                      id={solo.id}
-                      title={solo.title}
-                      notes={solo.notes}
-                      instrument={selectedStudent.instrument}
-                      onUpdate={(t, n) => updateSolo(solo.id, t, n)}
-                      onRemove={() => setCurrentSolos(currentSolos.filter(s => s.id !== solo.id))}
-                    />
-                  ))}
-                  {currentSolos.length === 0 && (
-                    <button onClick={handleAddSolo} className="w-full py-16 border-2 border-dashed border-[#E87A2C]/20 rounded-[48px] text-[#E87A2C]/40 hover:text-[#E87A2C] hover:bg-orange-50/30 transition-all flex flex-col items-center gap-4 group">
-                      <Music className="w-12 h-12 opacity-20 group-hover:opacity-100 transition-opacity" />
-                      <span className="font-black uppercase tracking-[0.3em] text-xs">Criar Ditado de Solo</span>
-                    </button>
-                  )}
-                </section>
+                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                  <section className="space-y-8">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Music className="text-[#E87A2C]" /> Ditador de Melodias</h3>
+                      <button onClick={handleAddSolo} className="px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-[#3C2415] transition-all"><Plus className="w-4 h-4" /> Novo Trecho</button>
+                    </div>
+                    {currentSolos.map(solo => (
+                      <SoloEditor
+                        key={solo.id}
+                        id={solo.id}
+                        title={solo.title}
+                        notes={solo.notes}
+                        instrument={selectedStudent.instrument}
+                        onUpdate={(t, n) => updateSolo(solo.id, t, n)}
+                        onRemove={() => setCurrentSolos(currentSolos.filter(s => s.id !== solo.id))}
+                      />
+                    ))}
+                    {currentSolos.length === 0 && (
+                      <button onClick={handleAddSolo} className="w-full py-16 border-2 border-dashed border-[#E87A2C]/20 rounded-[48px] text-[#E87A2C]/40 hover:text-[#E87A2C] hover:bg-orange-50/30 transition-all flex flex-col items-center gap-4 group">
+                        <Music className="w-12 h-12 opacity-20 group-hover:opacity-100 transition-opacity" />
+                        <span className="font-black uppercase tracking-[0.3em] text-xs">Criar Ditado de Solo</span>
+                      </button>
+                    )}
+                  </section>
+                )}
 
                 {/* Tablaturas */}
                 <section className="space-y-6">
@@ -619,6 +772,67 @@ const App: React.FC = () => {
                     <PlusCircle className="w-6 h-6" /> ADICIONAR TABLATURA / RIFF
                   </button>
                 </section>
+
+                {/* Grave Guia Vocal - APENAS PARA VOCAL */}
+                {selectedStudent?.instrument === Instrument.VOCALS && (
+                  <section className="bg-[#1A110D] rounded-[48px] p-10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 animate-pulse" />
+
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-10">
+                        <div>
+                          <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
+                            <Disc className={`w-6 h-6 ${isRecording ? 'text-red-500 animate-ping' : 'text-[#E87A2C]'}`} />
+                            MusiClass Studio
+                          </h3>
+                          <p className="text-[9px] font-bold text-stone-500 uppercase tracking-widest mt-1">Grave guias de treino para o aluno</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center py-6 border-b border-white/5 mb-8">
+                        <button
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ${isRecording ? 'bg-red-600 scale-110 shadow-red-500/20' : 'bg-white hover:bg-[#E87A2C] group/btn'}`}
+                        >
+                          {isRecording ? (
+                            <div className="w-6 h-6 bg-white rounded-sm animate-pulse" />
+                          ) : (
+                            <Plus className="w-8 h-8 text-[#1A110D] group-hover:text-white transition-colors" />
+                          )}
+                        </button>
+                        <p className="mt-4 text-[10px] font-black text-stone-400 uppercase tracking-[0.3em]">
+                          {isRecording ? 'Gravando...' : 'Gravar Nova Guia'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {recordings.map((rec, idx) => (
+                          <div key={rec.id} className="bg-white/5 p-6 rounded-3xl border border-white/10 flex flex-col gap-4 group/item">
+                            <div className="flex items-center justify-between">
+                              <input
+                                value={rec.title}
+                                onChange={(e) => {
+                                  const newRecs = [...recordings];
+                                  newRecs[idx].title = e.target.value;
+                                  setRecordings(newRecs);
+                                }}
+                                className="bg-transparent border-none text-white font-black uppercase text-sm tracking-tight focus:ring-0 p-0 w-2/3"
+                                placeholder="Título da Guia"
+                              />
+                              <button onClick={() => setRecordings(recordings.filter(r => r.id !== rec.id))} className="text-rose-500 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <audio src={rec.url} controls className="w-full h-8 brightness-90 contrast-125" />
+                          </div>
+                        ))}
+                        {recordings.length === 0 && !isRecording && (
+                          <div className="py-10 text-center opacity-20 font-black uppercase text-[10px] tracking-widest text-white">Nenhuma guia gravada</div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
               </div>
 
               {/* Sidebar do Editor */}
@@ -629,7 +843,10 @@ const App: React.FC = () => {
                       <h3 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-4 flex items-center gap-2">Pauta Pedagógica</h3>
                       <textarea value={currentObjective} onChange={(e) => setCurrentObjective(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-[32px] p-8 h-60 text-sm font-medium focus:ring-2 focus:ring-[#E87A2C]" placeholder="Descreva os objetivos da aula..." />
                     </div>
-                    <button onClick={handleGenerateReport} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-[#3C2415] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-stone-950/20"><Sparkles className="w-4 h-4" /> FINALIZAR E GERAR PNG</button>
+                    <button onClick={handleGenerateReport} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-[#3C2415] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-stone-950/20">
+                      <Sparkles className="w-4 h-4" />
+                      {selectedStudent?.instrument === Instrument.VOCALS ? 'GERAR FICHA INTERATIVA (PDF)' : 'FINALIZAR E GERAR PNG'}
+                    </button>
                   </div>
                 </section>
               </div>
@@ -637,119 +854,124 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'history' && (
-          <div className="max-w-6xl mx-auto animate-fade-in space-y-12">
-            <header>
-              <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Histórico de Aulas</h2>
-              <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Acompanhamento pedagógico</p>
-            </header>
+        {
+          activeTab === 'history' && (
+            <div className="max-w-6xl mx-auto animate-fade-in space-y-12">
+              <header>
+                <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Histórico de Aulas</h2>
+                <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Acompanhamento pedagógico</p>
+              </header>
 
-            <div className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm overflow-hidden">
-              <div className="space-y-6">
-                {lessonHistory
-                  .filter(h => currentUser?.role === 'director' || h.teacher_id === currentUser?.id)
-                  .map((h, i) => (
-                    <div key={i} className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-[#FBF6F0] rounded-3xl gap-4 group hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-orange-100">
-                      <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#E87A2C] font-black shadow-sm group-hover:bg-[#E87A2C] group-hover:text-white transition-all text-xl">{h.mc_students?.name.charAt(0)}</div>
-                        <div>
-                          <h4 className="font-black text-xl text-[#1A110D] uppercase tracking-tighter">{h.mc_students?.name}</h4>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-[#1A110D] text-white rounded">{h.mc_students?.instrument}</span>
-                            <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(h.created_at).toLocaleDateString()}</span>
+              <div className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm overflow-hidden">
+                <div className="space-y-6">
+                  {lessonHistory
+                    .filter(h => currentUser?.role === 'director' || h.teacher_id === currentUser?.id)
+                    .map((h, i) => (
+                      <div key={i} className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-[#FBF6F0] rounded-3xl gap-4 group hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-orange-100">
+                        <div className="flex items-center gap-6">
+                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#E87A2C] font-black shadow-sm group-hover:bg-[#E87A2C] group-hover:text-white transition-all text-xl">{h.mc_students?.name.charAt(0)}</div>
+                          <div>
+                            <h4 className="font-black text-xl text-[#1A110D] uppercase tracking-tighter">{h.mc_students?.name}</h4>
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-[#1A110D] text-white rounded">{h.mc_students?.instrument}</span>
+                              <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(h.created_at).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4 w-full md:w-auto">
-                        <div className="flex-grow md:flex-grow-0 bg-white/50 px-4 py-3 rounded-2xl border border-stone-100">
-                          <p className="text-[7px] font-black text-stone-300 uppercase tracking-widest mb-1">Pauta</p>
-                          <p className="text-[10px] font-bold text-[#3C2415] line-clamp-1 max-w-[200px]">{h.objective || 'Sem pauta descrita'}</p>
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                          <div className="flex-grow md:flex-grow-0 bg-white/50 px-4 py-3 rounded-2xl border border-stone-100">
+                            <p className="text-[7px] font-black text-stone-300 uppercase tracking-widest mb-1">Pauta</p>
+                            <p className="text-[10px] font-bold text-[#3C2415] line-clamp-1 max-w-[200px]">{h.objective || 'Sem pauta descrita'}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(students.find(s => s.id === h.student_id) || null);
+                              setCurrentChords(h.report_data.chords || []);
+                              setCurrentScales(h.report_data.scales || []);
+                              setCurrentSolos(h.report_data.solos || []);
+                              setCurrentTabs(h.report_data.tabs || []);
+                              setExercises(h.report_data.exercises || []);
+                              setCurrentObjective(h.objective || '');
+                              setRecordings(h.report_data.recordings || []);
+                              setActiveTab('lesson');
+                            }}
+                            className="bg-[#1A110D] text-white px-6 py-4 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-[#E87A2C] transition-all shadow-lg shadow-stone-900/10"
+                          >
+                            Abrir Aula
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(students.find(s => s.id === h.student_id) || null);
-                            setCurrentChords(h.report_data.chords || []);
-                            setCurrentScales(h.report_data.scales || []);
-                            setCurrentSolos(h.report_data.solos || []);
-                            setCurrentTabs(h.report_data.tabs || []);
-                            setExercises(h.report_data.exercises || []);
-                            setCurrentObjective(h.objective || '');
-                            setActiveTab('lesson');
-                          }}
-                          className="bg-[#1A110D] text-white px-6 py-4 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-[#E87A2C] transition-all shadow-lg shadow-stone-900/10"
-                        >
-                          Abrir Aula
-                        </button>
                       </div>
-                    </div>
-                  ))}
-                {lessonHistory.length === 0 && (
-                  <div className="py-20 text-center opacity-20 font-black uppercase text-xs tracking-[0.5em]">Nenhuma aula finalizada ainda</div>
-                )}
+                    ))}
+                  {lessonHistory.length === 0 && (
+                    <div className="py-20 text-center opacity-20 font-black uppercase text-xs tracking-[0.5em]">Nenhuma aula finalizada ainda</div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
-        {activeTab === 'dashboard' && currentUser.role === 'director' && (
-          <div className="max-w-7xl mx-auto animate-fade-in space-y-12">
-            <header className="mb-12">
-              <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Painel Administrativo</h2>
-              <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Gestão da Escola</p>
-            </header>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Dashboard Content - Reuse existing logic */}
-              <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Users className="text-[#E87A2C]" /> Professores</h3>
-                  <button onClick={() => setIsAddingTeacher(true)} className="p-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2">Adicionar</button>
-                </div>
-                <div className="space-y-4">
-                  {teachers.map(t => (
-                    <div key={t.id} className="bg-[#FBF6F0] p-6 rounded-3xl flex justify-between items-center group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#E87A2C] font-black shadow-sm group-hover:bg-[#E87A2C] group-hover:text-white transition-all">{t.name.charAt(0)}</div>
-                        <div>
-                          <p className="font-black text-[#3C2415] uppercase tracking-tight">{t.name}</p>
-                          <p className="text-[10px] font-bold text-[#3C2415]/40 uppercase tracking-widest">{students.filter(s => s.teacher_id === t.id).length} Alunos • Senha: {t.password}</p>
+        {
+          activeTab === 'dashboard' && currentUser.role === 'director' && (
+            <div className="max-w-7xl mx-auto animate-fade-in space-y-12">
+              <header className="mb-12">
+                <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Painel Administrativo</h2>
+                <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Gestão da Escola</p>
+              </header>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                {/* Dashboard Content - Reuse existing logic */}
+                <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Users className="text-[#E87A2C]" /> Professores</h3>
+                    <button onClick={() => setIsAddingTeacher(true)} className="p-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2">Adicionar</button>
+                  </div>
+                  <div className="space-y-4">
+                    {teachers.map(t => (
+                      <div key={t.id} className="bg-[#FBF6F0] p-6 rounded-3xl flex justify-between items-center group">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#E87A2C] font-black shadow-sm group-hover:bg-[#E87A2C] group-hover:text-white transition-all">{t.name.charAt(0)}</div>
+                          <div>
+                            <p className="font-black text-[#3C2415] uppercase tracking-tight">{t.name}</p>
+                            <p className="text-[10px] font-bold text-[#3C2415]/40 uppercase tracking-widest">{students.filter(s => s.teacher_id === t.id).length} Alunos • Senha: {t.password}</p>
+                          </div>
                         </div>
+                        {t.id !== 'director' && <button onClick={() => handleDeleteTeacher(t.id)} className="p-3 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all opacity-0 group-hover:opacity-100"><Trash2 className="w-5 h-5" /></button>}
                       </div>
-                      {t.id !== 'director' && <button onClick={() => handleDeleteTeacher(t.id)} className="p-3 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all opacity-0 group-hover:opacity-100"><Trash2 className="w-5 h-5" /></button>}
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><BookOpen className="text-[#E87A2C]" /> Todos os Alunos ({students.length})</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-[#3C2415]/5">
-                        <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest">Nome</th>
-                        <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest">Instrumento</th>
-                        <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest text-right">Idade</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#3C2415]/5">
-                      {students.map(s => (
-                        <tr key={s.id} className="group">
-                          <td className="py-4 font-bold text-[#3C2415] uppercase text-sm">{s.name}</td>
-                          <td className="py-4"><span className="text-[9px] font-black px-3 py-1 bg-[#1A110D] text-white rounded-full uppercase italic">{s.instrument}</span></td>
-                          <td className="py-4 text-right font-black text-[#E87A2C] text-sm tabular-nums">{s.age || '-'}</td>
+                    ))}
+                  </div>
+                </section>
+                <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><BookOpen className="text-[#E87A2C]" /> Todos os Alunos ({students.length})</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-[#3C2415]/5">
+                          <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest">Nome</th>
+                          <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest">Instrumento</th>
+                          <th className="pb-4 text-[10px] font-black uppercase text-[#3C2415]/30 tracking-widest text-right">Idade</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                      </thead>
+                      <tbody className="divide-y divide-[#3C2415]/5">
+                        {students.map(s => (
+                          <tr key={s.id} className="group">
+                            <td className="py-4 font-bold text-[#3C2415] uppercase text-sm">{s.name}</td>
+                            <td className="py-4"><span className="text-[9px] font-black px-3 py-1 bg-[#1A110D] text-white rounded-full uppercase italic">{s.instrument}</span></td>
+                            <td className="py-4 text-right font-black text-[#E87A2C] text-sm tabular-nums">{s.age || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+              <div className="flex justify-center pt-10">
+                <button onClick={handleResetData} className="px-10 py-5 border border-rose-500/20 text-rose-500 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-rose-50 transition-all flex items-center gap-3"><RotateCcw className="w-4 h-4" /> Resetar Banco de Dados (Alunos)</button>
+              </div>
             </div>
-            <div className="flex justify-center pt-10">
-              <button onClick={handleResetData} className="px-10 py-5 border border-rose-500/20 text-rose-500 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-rose-50 transition-all flex items-center gap-3"><RotateCcw className="w-4 h-4" /> Resetar Banco de Dados (Alunos)</button>
-            </div>
-          </div>
-        )}
+          )
+        }
       </main>
 
       {isPreviewing && selectedStudent && (
@@ -763,47 +985,63 @@ const App: React.FC = () => {
           exercises={exercises}
           tabs={currentTabs}
           solos={currentSolos}
+          recordings={recordings}
           onClose={() => setIsPreviewing(false)}
+          onExport={handleExportSuccess}
         />
       )}
 
-      {isAddingStudent && (
-        <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[100] p-6">
-          <div className="bg-white rounded-[64px] p-12 w-full max-w-xl shadow-2xl relative overflow-hidden animate-fade-in">
-            <h3 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase mb-6">Novo Aluno</h3>
-            <form onSubmit={addStudent} className="space-y-6">
-              <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Nome Completo" />
-              <div className="grid grid-cols-2 gap-6">
-                <input name="age" type="number" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Idade" />
-                <select name="level" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Level).map(l => <option key={l} value={l}>{l}</option>)}</select>
-              </div>
-              <select name="instrument" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Instrument).map(i => <option key={i} value={i}>{i}</option>)}</select>
-              <button type="submit" className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-lg shadow-xl hover:bg-[#3C2415] transition-all">SALVAR ALUNO</button>
-              <button type="button" onClick={() => setIsAddingStudent(false)} className="w-full text-[#3C2415]/30 font-bold uppercase text-[10px] tracking-widest mt-4">Dispensar</button>
-            </form>
-          </div>
-        </div>
-      )}
+      {
+        isManualChordOpen && selectedStudent && (
+          <ManualChordEditor
+            instrument={selectedStudent.instrument}
+            onClose={() => setIsManualChordOpen(false)}
+            onSave={saveManualChord}
+          />
+        )
+      }
 
-      {isAddingTeacher && (
-        <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[200] p-6">
-          <div className="bg-white rounded-[64px] p-12 w-full max-w-lg shadow-2xl animate-fade-in">
-            <h3 className="text-3xl font-black text-[#3C2415] tracking-tighter uppercase mb-2">Novo Professor</h3>
-            <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-8 tracking-widest">Crie uma conta de acesso para um colega</p>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleAddTeacher(formData.get('name') as string, formData.get('pass') as string);
-            }} className="space-y-6">
-              <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Nome do Professor" />
-              <input name="pass" required maxLength={4} className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Senha (4 números)" />
-              <button type="submit" className="w-full bg-[#E87A2C] text-white py-5 rounded-3xl font-black text-lg shadow-xl">CADASTRAR</button>
-              <button type="button" onClick={() => setIsAddingTeacher(false)} className="w-full text-stone-400 font-bold text-xs uppercase py-2">Cancelar</button>
-            </form>
+      {
+        isAddingStudent && (
+          <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[100] p-6">
+            <div className="bg-white rounded-[64px] p-12 w-full max-w-xl shadow-2xl relative overflow-hidden animate-fade-in">
+              <h3 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase mb-6">Novo Aluno</h3>
+              <form onSubmit={addStudent} className="space-y-6">
+                <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Nome Completo" />
+                <div className="grid grid-cols-2 gap-6">
+                  <input name="age" type="number" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Idade" />
+                  <select name="level" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Level).map(l => <option key={l} value={l}>{l}</option>)}</select>
+                </div>
+                <select name="instrument" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Instrument).map(i => <option key={i} value={i}>{i}</option>)}</select>
+                <button type="submit" className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-lg shadow-xl hover:bg-[#3C2415] transition-all">SALVAR ALUNO</button>
+                <button type="button" onClick={() => setIsAddingStudent(false)} className="w-full text-[#3C2415]/30 font-bold uppercase text-[10px] tracking-widest mt-4">Dispensar</button>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+
+      {
+        isAddingTeacher && (
+          <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[200] p-6">
+            <div className="bg-white rounded-[64px] p-12 w-full max-w-lg shadow-2xl animate-fade-in">
+              <h3 className="text-3xl font-black text-[#3C2415] tracking-tighter uppercase mb-2">Novo Professor</h3>
+              <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-8 tracking-widest">Crie uma conta de acesso para um colega</p>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleAddTeacher(formData.get('name') as string, formData.get('pass') as string);
+              }} className="space-y-6">
+                <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Nome do Professor" />
+                <input name="pass" required maxLength={4} className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Senha (4 números)" />
+                <button type="submit" className="w-full bg-[#E87A2C] text-white py-5 rounded-3xl font-black text-lg shadow-xl">CADASTRAR</button>
+                <button type="button" onClick={() => setIsAddingTeacher(false)} className="w-full text-stone-400 font-bold text-xs uppercase py-2">Cancelar</button>
+              </form>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };
 

@@ -39,6 +39,14 @@ export interface ChordDefinition {
   extension?: string;
   notes: string[];
   intervals: number[];
+  bass?: string; // For inverted chords like D/F#
+  isCustom?: boolean;
+}
+
+export interface SoloNote {
+  note: string;
+  type: 'solo' | 'harmony';
+  position?: number; // Optional position in the sequence for alignment (0-indexed)
 }
 
 export interface LessonHistory {
@@ -53,6 +61,7 @@ export interface LessonHistory {
     tabs: any[];
     solos: any[];
     exercises: string[];
+    recordings?: { id: string, title: string, url: string }[];
   };
   mc_students?: {
     name: string;

@@ -1,5 +1,6 @@
-
 import React from 'react';
+
+const CHROMATIC_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 interface NoteWithIndex {
     name: string;
@@ -11,10 +12,12 @@ interface KeyboardVisualizerProps {
     root: string;
     type?: string;
     ext?: string;
-    notesWithIndices?: NoteWithIndex[];
+    bass?: string;
+    notesWithIndices?: any[];
+    isCustom?: boolean;
 }
 
-export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNotes, root, type, ext, notesWithIndices }) => {
+export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNotes, root, type, ext, bass, notesWithIndices, isCustom }) => {
     const WHITE_KEYS_COUNT = 10; // 10 white keys makes each key slightly wider and more readable
 
     const isWhiteKey = (absIdx: number) => {
@@ -62,19 +65,40 @@ export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNot
 
     const isHighlighted = (absIdx: number) => {
         if (!notesWithIndices) return false;
+
+        // Check for Bass highlight
+        if (bass && bass !== 'none') {
+            const normalizedAbsIdx = ((absIdx % 12) + 12) % 12;
+            const normalizedBassIdx = CHROMATIC_SCALE.indexOf(bass);
+            if (normalizedAbsIdx === normalizedBassIdx && absIdx < 12) return true; // Highlight bass in first octave
+        }
+
+        if (isCustom) {
+            // Check direct absolute index for custom chords
+            return notesWithIndices.includes(absIdx);
+        }
         return notesWithIndices.some(ni => ni.absIndex === absIdx);
     };
 
     const getNoteName = (absIdx: number) => {
+        if (isCustom) return ''; // Manual chords don't need note names inside
+
+        // If it's the bass note, return its name
+        if (bass && bass !== 'none') {
+            const normalizedAbsIdx = ((absIdx % 12) + 12) % 12;
+            const normalizedBassIdx = CHROMATIC_SCALE.indexOf(bass);
+            if (normalizedAbsIdx === normalizedBassIdx && absIdx < 12) return bass;
+        }
+
         const note = notesWithIndices?.find(ni => ni.absIndex === absIdx);
         if (!note) return '';
-        // Simplificar nomes para caber nos marcadores
         return note.name.replace('maj', '').replace('min', 'm');
     };
 
     const displayType = type === 'min' ? 'm' : (type === 'maj' ? '' : (type || ''));
     const displayExt = ext === 'none' || !ext ? '' : ext;
-    const fullChordName = `${root}${displayType}${displayExt}`;
+    const displayBass = bass && bass !== 'none' ? `/${bass}` : '';
+    const fullChordName = isCustom ? root : `${root}${displayType}${displayExt}${displayBass}`;
 
     return (
         <div className="flex flex-col bg-white border border-stone-200 rounded-xl overflow-hidden shadow-md group transition-all duration-300 w-full max-w-[400px]">
