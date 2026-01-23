@@ -24,10 +24,13 @@ import {
   History as HistoryIcon,
   Clock,
   MousePointer2,
-  Disc
+  Disc,
+  Volume2,
+  Activity
 } from 'lucide-react';
 
 import * as XLSX from 'xlsx';
+import { DrumsStudio } from './components/DrumsStudio';
 import { Instrument, Level, Student, Teacher } from './types';
 import { ROOTS, CHORD_TYPES, SCALES } from './constants';
 import { MusicEngine } from './services/musicEngine';
@@ -57,6 +60,7 @@ const App: React.FC = () => {
   const [exercises, setExercises] = useState<string[]>([]);
   const [newExercise, setNewExercise] = useState('');
   const [currentObjective, setCurrentObjective] = useState('');
+  const [drumsData, setDrumsData] = useState<{ rhythms: any[], rudiments: any[], positions?: any }>({ rhythms: [], rudiments: [], positions: undefined });
   const [lessonHistory, setLessonHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isManualChordOpen, setIsManualChordOpen] = useState(false);
@@ -352,6 +356,7 @@ const App: React.FC = () => {
       setExercises([]);
       setCurrentObjective('');
       setRecordings([]);
+      setDrumsData({ rhythms: [], rudiments: [], positions: undefined });
     }
     setSelectedStudent(student);
     setActiveTab('lesson');
@@ -400,18 +405,33 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDrumRecord = (blob: Blob, title: string) => {
+    const url = URL.createObjectURL(blob);
+    const newRecording = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: title,
+      blob,
+      url
+    };
+    setRecordings(prev => [...prev, newRecording]);
+  };
+
   const handleGenerateReport = async () => {
     if (!selectedStudent || !currentUser) return;
+    setIsPreviewing(true);
+  };
 
-    // Upload all recorded blobs that don't have a public URL yet (blobs from local recording session)
+  const handleExportSuccess = async (): Promise<any[]> => {
+    if (!selectedStudent || !currentUser) return recordings;
+
+    setLoading(true);
+    let finalRecordings = [...recordings];
+
+    // 1. Upload audios ONLY if they have blobs (unsaved yet)
     const needsUpload = recordings.filter(r => r.blob !== null);
-
     if (needsUpload.length > 0) {
-      setLoading(true);
-      const updatedRecordings = [...recordings];
-
-      for (let i = 0; i < updatedRecordings.length; i++) {
-        const rec = updatedRecordings[i];
+      for (let i = 0; i < finalRecordings.length; i++) {
+        const rec = finalRecordings[i];
         if (rec.blob) {
           const fileName = `guide-${selectedStudent.id}-${Date.now()}-${rec.id}.webm`;
           const { data, error } = await supabase.storage
@@ -422,29 +442,22 @@ const App: React.FC = () => {
             const { data: { publicUrl } } = supabase.storage
               .from('lesson-audios')
               .getPublicUrl(fileName);
-
-            updatedRecordings[i] = { ...rec, url: publicUrl, blob: null };
+            finalRecordings[i] = { ...rec, url: publicUrl, blob: null };
           }
         }
       }
-
-      setRecordings(updatedRecordings);
-      setLoading(false);
+      setRecordings(finalRecordings);
     }
 
-    setIsPreviewing(true);
-  };
-
-  const handleExportSuccess = async () => {
-    if (!selectedStudent || !currentUser) return;
-
+    // 2. Save Lesson to DB
     const reportData = {
       chords: currentChords,
       scales: currentScales,
       tabs: currentTabs,
       solos: currentSolos,
       exercises: exercises,
-      recordings: recordings.map(r => ({ id: r.id, title: r.title, url: r.url }))
+      recordings: finalRecordings.map(r => ({ id: r.id, title: r.title, url: r.url })),
+      drums: drumsData
     };
 
     const { error } = await supabase.from('mc_lesson_history').insert([{
@@ -455,7 +468,10 @@ const App: React.FC = () => {
     }]);
 
     if (error) console.error("Erro ao salvar histórico:", error);
+
     await fetchInitialData();
+    setLoading(false);
+    return finalRecordings;
   };
 
   const handleAddScale = () => {
@@ -616,7 +632,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               <div className="lg:col-span-8 space-y-12">
                 {/* Harmonias */}
-                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                {selectedStudent?.instrument !== Instrument.VOCALS && selectedStudent?.instrument !== Instrument.DRUMS && (
                   <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
                     <div className="flex items-center justify-between mb-10">
                       <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Zap className="text-[#E87A2C]" /> Harmonias e Acordes</h3>
@@ -673,7 +689,7 @@ const App: React.FC = () => {
                 )}
 
                 {/* Escalas */}
-                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                {selectedStudent?.instrument !== Instrument.VOCALS && selectedStudent?.instrument !== Instrument.DRUMS && (
                   <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
                     <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3 mb-10"><Layout className="text-[#E87A2C]" /> Campo Harmônico / Escalas</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
@@ -734,7 +750,18 @@ const App: React.FC = () => {
                 </section>
 
                 {/* Ditador de Solos Dinâmico */}
-                {selectedStudent?.instrument !== Instrument.VOCALS && (
+                {selectedStudent?.instrument === Instrument.DRUMS && (
+                  <DrumsStudio
+                    initialRhythms={drumsData.rhythms}
+                    initialRudiments={drumsData.rudiments}
+                    initialPositions={drumsData.positions}
+                    onChange={(data) => setDrumsData(data)}
+                    onRecordLoop={handleDrumRecord}
+                  />
+                )}
+
+                {/* Ditador de Solos Dinâmico */}
+                {selectedStudent?.instrument !== Instrument.VOCALS && selectedStudent?.instrument !== Instrument.DRUMS && (
                   <section className="space-y-8">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><Music className="text-[#E87A2C]" /> Ditador de Melodias</h3>
@@ -760,21 +787,23 @@ const App: React.FC = () => {
                   </section>
                 )}
 
-                {/* Tablaturas */}
-                <section className="space-y-6">
-                  {currentTabs.map(tab => (
-                    <div key={tab.id} className="relative">
-                      <TabEditor title={tab.title} onTitleChange={(t) => updateTab(tab.id, t, tab.content)} value={tab.content} onChange={(c) => updateTab(tab.id, tab.title, c)} />
-                      <button onClick={() => removeTab(tab.id)} className="absolute top-6 right-6 text-rose-500 hover:text-rose-700"><Trash2 className="w-5 h-5" /></button>
-                    </div>
-                  ))}
-                  <button onClick={handleAddTab} className="w-full py-10 border-2 border-dashed border-stone-200 rounded-[48px] text-stone-300 font-black flex items-center justify-center gap-3 hover:bg-stone-50 transition-all">
-                    <PlusCircle className="w-6 h-6" /> ADICIONAR TABLATURA / RIFF
-                  </button>
-                </section>
+                {/* Tablaturas (Ocultar para Bateria) */}
+                {selectedStudent?.instrument !== Instrument.DRUMS && (
+                  <section className="space-y-6">
+                    {currentTabs.map(tab => (
+                      <div key={tab.id} className="relative">
+                        <TabEditor title={tab.title} onTitleChange={(t) => updateTab(tab.id, t, tab.content)} value={tab.content} onChange={(c) => updateTab(tab.id, tab.title, c)} />
+                        <button onClick={() => removeTab(tab.id)} className="absolute top-6 right-6 text-rose-500 hover:text-rose-700"><Trash2 className="w-5 h-5" /></button>
+                      </div>
+                    ))}
+                    <button onClick={handleAddTab} className="w-full py-10 border-2 border-dashed border-stone-200 rounded-[48px] text-stone-300 font-black flex items-center justify-center gap-3 hover:bg-stone-50 transition-all">
+                      <PlusCircle className="w-6 h-6" /> ADICIONAR TABLATURA / RIFF
+                    </button>
+                  </section>
+                )}
 
-                {/* Grave Guia Vocal - APENAS PARA VOCAL */}
-                {selectedStudent?.instrument === Instrument.VOCALS && (
+                {/* MusiClass Studio - Gravador e Guia de Treino */}
+                {(selectedStudent?.instrument === Instrument.VOCALS || selectedStudent?.instrument === Instrument.DRUMS) && (
                   <section className="bg-[#1A110D] rounded-[48px] p-10 shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 animate-pulse" />
 
@@ -789,21 +818,23 @@ const App: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-center py-6 border-b border-white/5 mb-8">
-                        <button
-                          onClick={isRecording ? stopRecording : startRecording}
-                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ${isRecording ? 'bg-red-600 scale-110 shadow-red-500/20' : 'bg-white hover:bg-[#E87A2C] group/btn'}`}
-                        >
-                          {isRecording ? (
-                            <div className="w-6 h-6 bg-white rounded-sm animate-pulse" />
-                          ) : (
-                            <Plus className="w-8 h-8 text-[#1A110D] group-hover:text-white transition-colors" />
-                          )}
-                        </button>
-                        <p className="mt-4 text-[10px] font-black text-stone-400 uppercase tracking-[0.3em]">
-                          {isRecording ? 'Gravando...' : 'Gravar Nova Guia'}
-                        </p>
-                      </div>
+                      {selectedStudent?.instrument === Instrument.VOCALS && (
+                        <div className="flex flex-col items-center py-6 border-b border-white/5 mb-8">
+                          <button
+                            onClick={isRecording ? stopRecording : startRecording}
+                            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ${isRecording ? 'bg-red-600 scale-110 shadow-red-500/20' : 'bg-white hover:bg-[#E87A2C] group/btn'}`}
+                          >
+                            {isRecording ? (
+                              <div className="w-6 h-6 bg-white rounded-sm animate-pulse" />
+                            ) : (
+                              <Plus className="w-8 h-8 text-[#1A110D] group-hover:text-white transition-colors" />
+                            )}
+                          </button>
+                          <p className="mt-4 text-[10px] font-black text-stone-400 uppercase tracking-[0.3em]">
+                            {isRecording ? 'Gravando...' : 'Gravar Nova Guia'}
+                          </p>
+                        </div>
+                      )}
 
                       <div className="space-y-4">
                         {recordings.map((rec, idx) => (
@@ -845,7 +876,7 @@ const App: React.FC = () => {
                     </div>
                     <button onClick={handleGenerateReport} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-[#3C2415] transition-all flex items-center justify-center gap-3 shadow-2xl shadow-stone-950/20">
                       <Sparkles className="w-4 h-4" />
-                      {selectedStudent?.instrument === Instrument.VOCALS ? 'GERAR FICHA INTERATIVA (PDF)' : 'FINALIZAR E GERAR PNG'}
+                      {(selectedStudent?.instrument === Instrument.VOCALS || selectedStudent?.instrument === Instrument.DRUMS) ? 'GERAR FICHA INTERATIVA (PDF)' : 'FINALIZAR E GERAR PNG'}
                     </button>
                   </div>
                 </section>
@@ -893,6 +924,7 @@ const App: React.FC = () => {
                               setExercises(h.report_data.exercises || []);
                               setCurrentObjective(h.objective || '');
                               setRecordings(h.report_data.recordings || []);
+                              setDrumsData(h.report_data.drums || { rhythms: [], rudiments: [], positions: undefined });
                               setActiveTab('lesson');
                             }}
                             className="bg-[#1A110D] text-white px-6 py-4 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-[#E87A2C] transition-all shadow-lg shadow-stone-900/10"
@@ -986,6 +1018,7 @@ const App: React.FC = () => {
           tabs={currentTabs}
           solos={currentSolos}
           recordings={recordings}
+          drums={drumsData}
           onClose={() => setIsPreviewing(false)}
           onExport={handleExportSuccess}
         />

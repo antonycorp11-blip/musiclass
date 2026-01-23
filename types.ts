@@ -62,6 +62,11 @@ export interface LessonHistory {
     solos: any[];
     exercises: string[];
     recordings?: { id: string, title: string, url: string }[];
+    drums?: {
+      rhythms: { id: string, title: string, sequence: string[][], bpm: number, audioUrl?: string }[];
+      rudiments: { id: string, title: string, pattern: string[] }[];
+      positions?: any;
+    };
   };
   mc_students?: {
     name: string;
