@@ -1,0 +1,16 @@
+{
+    "short_name": "MusiClass",
+    "name": "MusiClass Educational Ecosystem",
+    "icons": [
+        {
+            "src": "/assets/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#1A110D",
+    "background_color": "#FBF6F0"
+}
