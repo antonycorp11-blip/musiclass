@@ -95,17 +95,21 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        const pdf = new jsPDF('p', 'mm', 'a4', true);
         const imgWidth = 210;
         const pageHeight = 297;
 
         // Calculate aspect-ratio safe height
         let imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        // Force single page by scaling height if it overflows
-        const finalImgHeight = imgHeight > pageHeight ? pageHeight : imgHeight;
+        // Create PDF with custom height if it exceeds standard A4 to preserve 1:1 look
+        const pdf = new jsPDF({
+            orientation: 'p',
+            unit: 'mm',
+            format: [imgWidth, imgHeight],
+            compress: true
+        });
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, finalImgHeight, undefined, 'FAST');
+        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
         // Mapeamento Blindado de Links (Precisão Cirúrgica)
         const cards = documentRef.current.querySelectorAll('.audio-card-pdf');
@@ -126,11 +130,11 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             const relTop = rect.top - parentRect.top;
             const relLeft = rect.left - parentRect.left;
 
-            // Converter para milímetros no espaço do PDF
+            // Converter para milímetros no espaço do PDF (usando imgHeight real)
             const pdfX = (relLeft * 210) / parentRect.width;
-            const pdfY = (relTop * finalImgHeight) / parentRect.height;
+            const pdfY = (relTop * imgHeight) / parentRect.height;
             const pdfW = (rect.width * 210) / parentRect.width;
-            const pdfH = (rect.height * finalImgHeight) / parentRect.height;
+            const pdfH = (rect.height * imgHeight) / parentRect.height;
 
             pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
         });
@@ -148,7 +152,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                     <Logo light size="sm" />
                 </div>
                 <div className="flex gap-2">
-                    {(instrument === Instrument.VOCALS || instrument === Instrument.DRUMS) ? (
+                    {(instrument === Instrument.VOCALS || instrument === Instrument.DRUMS || instrument === Instrument.KEYBOARD || instrument === Instrument.PIANO || instrument === Instrument.GUITAR || instrument === Instrument.ELECTRIC_GUITAR || instrument === Instrument.BASS) ? (
                         <button
                             onClick={handleDownloadPDF}
                             className="bg-[#1A110D] hover:bg-stone-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10"
@@ -239,7 +243,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                             </div>
                                             <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest">Estrutura Harmônica</h2>
                                         </div>
-                                        <span className="text-[8px] font-bold text-stone-400 uppercase">{chords.length} ACORDES</span>
+                                        <span className="text-[11px] font-black text-stone-500 uppercase">{chords.length} ACORDES</span>
                                     </div>
                                     <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'} gap-3 md:gap-4`}>
                                         {chords.map((chord, i) => (
@@ -451,8 +455,8 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 </div>
                             )}
 
-                            {/* Guias de Estudo Interativas (Vocal e Bateria) */}
-                            {(instrument === Instrument.VOCALS || instrument === Instrument.DRUMS) && recordings.length > 0 && (
+                            {/* Guias de Estudo Interativas (Todos os instrumentos habilitados para PDF) */}
+                            {recordings.length > 0 && (
                                 <section className="pt-8 border-t border-stone-100">
                                     <div className="flex items-center gap-3 mb-6">
                                         <div className="w-6 h-6 bg-[#E87A2C]/10 rounded-lg flex items-center justify-center">

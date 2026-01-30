@@ -27,14 +27,19 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
     return <DrumsVisualizer root={root} />;
   }
 
+  const isBass = instrument === Instrument.BASS;
+  const numStrings = isBass ? 4 : 6;
+  const stringIndices = Array.from({ length: numStrings }, (_, i) => i);
+
   // Guitar/Bass Logic
   let shape: any;
   if (isCustom && notesWithIndices) {
     // Reconstruct shape from custom data
-    const frets: (number | null)[] = [null, null, null, null, null, null];
-    const fingers: number[] = [0, 0, 0, 0, 0, 0];
+    const frets: (number | null)[] = Array(numStrings).fill(null);
+    const fingers: number[] = Array(numStrings).fill(0);
     for (let j = 0; j < notesWithIndices.length; j += 3) {
       const s = notesWithIndices[j] - 1;
+      if (s >= numStrings) continue; // Safety check
       const f = notesWithIndices[j + 1];
       const fin = notesWithIndices[j + 2];
       frets[s] = f;
@@ -56,11 +61,11 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
 
   return (
     <div className={`flex flex-col bg-white border border-stone-200 rounded-xl overflow-hidden shadow-md group transition-all duration-300 w-full ${isFullscreen ? 'max-w-[400px]' : 'max-w-[260px] mx-auto'}`}>
-      <div className="bg-[#1A110D] py-1.5 px-3 flex justify-between items-center border-b border-black">
-        <h5 className="text-base font-black text-[#E87A2C] tracking-tighter uppercase leading-none truncate max-w-[65%]">{fullChordName}</h5>
+      <div className="bg-[#1A110D] py-3 px-4 flex justify-between items-center border-b border-black">
+        <h5 className="text-xl font-black text-[#E87A2C] uppercase leading-none">{fullChordName}</h5>
         <div className="flex gap-1 shrink-0">
           {!isCustom && chordNotes.slice(0, 3).map((n, i) => (
-            <span key={i} className="text-[7px] font-bold text-white/40 uppercase bg-white/5 px-1 rounded">{n}</span>
+            <span key={i} className="text-[10px] font-bold text-white uppercase bg-white/10 px-2 py-0.5 rounded-md">{n}</span>
           ))}
         </div>
       </div>
@@ -80,8 +85,8 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
             <div key={f} className="absolute w-full h-[2px] bg-stone-200" style={{ top: `${f * 20}%` }} />
           ))}
 
-          {[0, 1, 2, 3, 4, 5].map(s => (
-            <div key={s} className="absolute h-full w-[1px] bg-stone-300" style={{ left: `${s * 20}%` }} />
+          {stringIndices.map(s => (
+            <div key={s} className="absolute h-full w-[1px] bg-stone-300" style={{ left: `${s * (100 / (numStrings - 1))}%` }} />
           ))}
 
           {shape.barre && (
@@ -103,14 +108,14 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
           {shape.frets.map((fret: any, stringIndex: number) => {
             if (fret === null) {
               return (
-                <div key={stringIndex} className="absolute -top-7 text-rose-500 font-black text-sm" style={{ left: `${stringIndex * 20}%`, transform: 'translateX(-50%)' }}>
+                <div key={stringIndex} className="absolute -top-7 text-rose-500 font-black text-sm" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%`, transform: 'translateX(-50%)' }}>
                   &times;
                 </div>
               );
             }
             if (fret === 0) {
               return (
-                <div key={stringIndex} className="absolute -top-7 text-emerald-500 font-black text-sm" style={{ left: `${stringIndex * 20}%`, transform: 'translateX(-50%)' }}>
+                <div key={stringIndex} className="absolute -top-7 text-emerald-500 font-black text-sm" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%`, transform: 'translateX(-50%)' }}>
                   &#9675;
                 </div>
               );
@@ -125,7 +130,7 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
                 className="absolute w-7 h-7 bg-[#E87A2C] rounded-full border-2 border-white shadow-xl flex items-center justify-center text-white font-black text-[10px] z-30 transform -translate-x-1/2 -translate-y-1/2"
                 style={{
                   top: `${(relativeFret * 20) - 10}%`,
-                  left: `${stringIndex * 20}%`
+                  left: `${stringIndex * (100 / (numStrings - 1))}%`
                 }}
               >
                 {finger || ''}

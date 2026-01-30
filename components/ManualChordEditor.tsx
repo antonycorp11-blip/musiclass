@@ -18,6 +18,9 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
     const [guitarFingers, setGuitarFingers] = useState<{ s: number, f: number }[]>([]);
 
     const isKeyboard = instrument === Instrument.KEYBOARD || instrument === Instrument.PIANO;
+    const isBass = instrument === Instrument.BASS;
+    const numStrings = isBass ? 4 : 6;
+    const stringIndices = Array.from({ length: numStrings }, (_, i) => i);
 
     const toggleKeyboardNote = (noteIdx: number) => {
         if (selectedNotes.includes(noteIdx)) {
@@ -48,8 +51,8 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                 .map(gf => [gf.s + 1, gf.f, 1]);
 
             // However, we need to tell ChordVisualizer about ALL strings.
-            // Let's create a full 6-string array
-            const fullShape = [null, null, null, null, null, null];
+            // Let's create a full string array
+            const fullShape = Array(numStrings).fill(null);
             guitarFingers.forEach(gf => {
                 if (gf.f === -1) fullShape[gf.s] = null;
                 else fullShape[gf.s] = gf.f;
@@ -131,14 +134,14 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                                     ))}
 
                                     {/* String Lines */}
-                                    {[0, 1, 2, 3, 4, 5].map(s => (
-                                        <div key={s} className="absolute h-full w-[2px] bg-stone-200" style={{ left: `${s * 20}%` }} />
+                                    {stringIndices.map(s => (
+                                        <div key={s} className="absolute h-full w-[2px] bg-stone-200" style={{ left: `${s * (100 / (numStrings - 1))}%` }} />
                                     ))}
 
                                     {/* Interactive Dots for Frets */}
                                     {[1, 2, 3, 4, 5].map(f => (
                                         <div key={f} className="absolute w-full h-[20%] flex justify-between px-0" style={{ top: `${(f - 1) * 20}%` }}>
-                                            {[0, 1, 2, 3, 4, 5].map(s => {
+                                            {stringIndices.map(s => {
                                                 const isActive = guitarFingers.find(gf => gf.s === s && gf.f === f);
                                                 return (
                                                     <button
@@ -146,7 +149,7 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                                                         onClick={() => toggleGuitarFinger(s, f)}
                                                         className={`absolute w-12 h-12 -ml-6 rounded-full z-30 transition-all flex items-center justify-center text-sm font-black transform translate-y-4
                                                             ${isActive ? 'bg-[#E87A2C] text-white shadow-xl scale-125' : 'bg-transparent hover:bg-orange-500/10'}`}
-                                                        style={{ left: `${s * 20}%` }}
+                                                        style={{ left: `${s * (100 / (numStrings - 1))}%` }}
                                                     >
                                                         {isActive ? '1' : ''}
                                                     </button>
@@ -157,7 +160,7 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
 
                                     {/* Interactive Dots for Open/Quiet Strings */}
                                     <div className="absolute -top-12 w-full h-10 flex justify-between">
-                                        {[0, 1, 2, 3, 4, 5].map(s => {
+                                        {stringIndices.map(s => {
                                             const fretOnThisString = guitarFingers.find(gf => gf.s === s);
                                             const isQuiet = fretOnThisString?.f === -1;
                                             const isOpen = fretOnThisString?.f === 0;
@@ -172,7 +175,7 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                                                     }}
                                                     className={`absolute w-8 h-8 -ml-4 rounded-xl flex items-center justify-center font-black text-xs transition-all shadow-sm
                                                         ${isOpen ? 'bg-emerald-50 text-emerald-600 border-2 border-emerald-200' : isQuiet ? 'bg-rose-50 text-rose-600 border-2 border-rose-200' : 'text-stone-300 hover:text-stone-400'}`}
-                                                    style={{ left: `${s * 20}%` }}
+                                                    style={{ left: `${s * (100 / (numStrings - 1))}%` }}
                                                 >
                                                     {isOpen ? 'O' : isQuiet ? 'X' : '·'}
                                                 </button>

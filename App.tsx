@@ -301,6 +301,7 @@ const App: React.FC = () => {
           else if (lowerInst.includes('piano')) instrument = Instrument.PIANO;
           else if (lowerInst.includes('bateria') || lowerInst.includes('drums')) instrument = Instrument.DRUMS;
           else if (lowerInst.includes('vocal') || lowerInst.includes('voice') || lowerInst.includes('canto')) instrument = Instrument.VOCALS;
+          else if (lowerInst.includes('baixo') || lowerInst.includes('bass')) instrument = Instrument.BASS;
           else if (lowerInst.includes('viol') || lowerInst.includes('guitar')) instrument = Instrument.GUITAR;
 
 
