@@ -104,45 +104,44 @@ export const Timer: React.FC = () => {
     const progress = initialTime > 0 ? (seconds / initialTime) * 100 : 0;
 
     return (
-        <div className="bg-[#1A110D] p-10 rounded-[48px] border border-white/5 shadow-2xl h-full flex flex-col justify-between overflow-hidden relative">
-            {/* Progress Bar (Persistent) */}
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-white/5 z-20">
+        <div className="bg-[#1A110D] p-6 md:p-10 rounded-[40px] md:rounded-[48px] border border-white/5 shadow-2xl h-full flex flex-col justify-between overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-white/5 z-20">
                 <div
-                    className="h-full bg-[#E87A2C] transition-all duration-1000 ease-linear shadow-[0_0_15px_rgba(232,122,44,0.5)]"
+                    className="h-full bg-[#E87A2C] transition-all duration-1000 ease-linear"
                     style={{ width: `${progress}%` }}
                 />
             </div>
 
-            <div className="flex items-center justify-between relative z-10 pt-4">
-                <div className="flex items-center gap-3">
-                    <Clock className="w-5 h-5 text-[#E87A2C]" />
-                    <h3 className="font-black uppercase text-[10px] tracking-[0.3em] text-stone-500">Timer Pro v3</h3>
+            <div className="flex items-center justify-between relative z-10 pt-2">
+                <div className="flex items-center gap-2 md:gap-3">
+                    <Clock className="w-4 h-4 md:w-5 md:h-5 text-[#E87A2C]" />
+                    <h3 className="font-black uppercase text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] text-stone-500">Timer Pro</h3>
                 </div>
             </div>
 
-            <div className="flex-grow flex flex-col items-center justify-center relative z-10">
+            <div className="flex-grow flex flex-col items-center justify-center relative z-10 my-4 md:my-0">
                 {leadIn !== null ? (
-                    <div className="text-[250px] md:text-[350px] font-black text-[#E87A2C] leading-none animate-pulse">
+                    <div className="text-[150px] sm:text-[200px] md:text-[350px] font-black text-[#E87A2C] leading-none animate-pulse">
                         {leadIn === 0 ? 'GO' : leadIn}
                     </div>
                 ) : (
                     <div className="w-full flex flex-col items-center">
                         {(isActive || seconds > 0) ? (
-                            <div className="text-[200px] md:text-[300px] lg:text-[400px] font-black text-white tracking-tighter leading-none select-none drop-shadow-2xl">
+                            <div className="text-[80px] sm:text-[140px] md:text-[300px] lg:text-[400px] font-black text-white tracking-tighter leading-none select-none drop-shadow-2xl">
                                 {formatTime(seconds)}
                             </div>
                         ) : (
-                            <div className="flex items-center justify-center gap-12">
+                            <div className="flex items-center justify-center gap-4 sm:gap-8 md:gap-12">
                                 <div className="flex flex-col items-center">
-                                    <button onClick={() => adjustInput('min', 1)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronUp className="w-16 h-16" /></button>
-                                    <span className="text-[180px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputMinutes.toString().padStart(2, '0')}</span>
-                                    <button onClick={() => adjustInput('min', -1)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronDown className="w-16 h-16" /></button>
+                                    <button onClick={() => adjustInput('min', 1)} className="p-2 md:p-4 text-stone-700 hover:text-[#E87A2C]"><ChevronUp className="w-10 h-10 md:w-16 md:h-16" /></button>
+                                    <span className="text-[100px] sm:text-[150px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputMinutes.toString().padStart(2, '0')}</span>
+                                    <button onClick={() => adjustInput('min', -1)} className="p-2 md:p-4 text-stone-700 hover:text-[#E87A2C]"><ChevronDown className="w-10 h-10 md:w-16 md:h-16" /></button>
                                 </div>
-                                <span className="text-[150px] font-black text-[#E87A2C] -mt-10">:</span>
+                                <span className="text-[60px] md:text-[150px] font-black text-[#E87A2C] -mt-4 md:-mt-10">:</span>
                                 <div className="flex flex-col items-center">
-                                    <button onClick={() => adjustInput('sec', 10)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronUp className="w-16 h-16" /></button>
-                                    <span className="text-[180px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputSeconds.toString().padStart(2, '0')}</span>
-                                    <button onClick={() => adjustInput('sec', -10)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronDown className="w-16 h-16" /></button>
+                                    <button onClick={() => adjustInput('sec', 10)} className="p-2 md:p-4 text-stone-700 hover:text-[#E87A2C]"><ChevronUp className="w-10 h-10 md:w-16 md:h-16" /></button>
+                                    <span className="text-[100px] sm:text-[150px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputSeconds.toString().padStart(2, '0')}</span>
+                                    <button onClick={() => adjustInput('sec', -10)} className="p-2 md:p-4 text-stone-700 hover:text-[#E87A2C]"><ChevronDown className="w-10 h-10 md:w-16 md:h-16" /></button>
                                 </div>
                             </div>
                         )}
@@ -150,25 +149,25 @@ export const Timer: React.FC = () => {
                 )}
             </div>
 
-            <div className="flex gap-4 relative z-10 pb-4">
+            <div className="flex gap-3 md:gap-4 relative z-10 pb-2">
                 <button
                     onClick={handleStart}
                     disabled={leadIn !== null || (seconds === 0 && inputMinutes === 0 && inputSeconds === 0)}
                     className={`
-                        flex-grow py-8 rounded-[32px] flex items-center justify-center gap-4 transition-all active:scale-[0.98]
+                        flex-grow py-5 md:py-8 rounded-[24px] md:rounded-[32px] flex items-center justify-center gap-3 md:gap-4 transition-all active:scale-[0.98]
                         ${isActive ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-2xl shadow-orange-500/20 disabled:opacity-10'}
                     `}
                 >
-                    {isActive ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current" />}
-                    <span className="font-black uppercase tracking-[0.2em] text-lg">
-                        {isActive ? 'PAUSAR' : (seconds > 0 ? 'RETOMAR' : 'INICIAR')}
+                    {isActive ? <Pause className="w-6 h-6 md:w-8 md:h-8 fill-current" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
+                    <span className="font-black uppercase tracking-[0.2em] text-sm md:text-lg">
+                        {isActive ? 'PARAR' : (seconds > 0 ? 'RETOMAR' : 'INICIAR')}
                     </span>
                 </button>
                 <button
                     onClick={resetTimer}
-                    className="aspect-square w-24 flex items-center justify-center bg-white/5 text-stone-600 border border-white/10 rounded-[32px] hover:text-white transition-all shadow-xl"
+                    className="aspect-square w-16 md:w-24 flex items-center justify-center bg-white/5 text-stone-600 border border-white/10 rounded-[24px] md:rounded-[32px] hover:text-white transition-all shadow-xl"
                 >
-                    <RotateCcw className="w-8 h-8" />
+                    <RotateCcw className="w-6 h-6 md:w-8 md:h-8" />
                 </button>
             </div>
         </div>

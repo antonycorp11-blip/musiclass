@@ -46,7 +46,7 @@ export const Metronome: React.FC = () => {
     };
 
     const playVoice = (beat: number) => {
-        window.speechSynthesis.cancel(); // Stop current speech to prioritize the new one
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance((beat + 1).toString());
         utterance.rate = 3.5;
         utterance.pitch = 1.2;
@@ -57,7 +57,6 @@ export const Metronome: React.FC = () => {
     const playClick = (time: number, beat: number) => {
         if (!audioContext.current || !gainNode.current) return;
 
-        // Visual Sync
         const delay = (time - audioContext.current.currentTime) * 1000;
         setTimeout(() => {
             setCurrentBeat(beat);
@@ -65,13 +64,12 @@ export const Metronome: React.FC = () => {
 
         if (modeRef.current === 'voice') {
             playVoice(beat);
-            return; // ONLY voice in voice mode
+            return;
         }
 
         const osc = audioContext.current.createOscillator();
         const envelope = audioContext.current.createGain();
 
-        // High definition click
         const isFirstBeat = beat === 0;
         const useAccent = isFirstBeat && hasAccentRef.current;
 
@@ -119,38 +117,37 @@ export const Metronome: React.FC = () => {
     };
 
     return (
-        <div className="bg-[#0F0A09] p-10 rounded-[48px] border border-white/5 shadow-2xl space-y-10 relative overflow-hidden h-full flex flex-col justify-between">
+        <div className="bg-[#0F0A09] p-6 md:p-10 rounded-[40px] md:rounded-[48px] border border-white/5 shadow-2xl space-y-6 md:space-y-10 relative overflow-hidden h-full flex flex-col justify-between">
             <div className={`absolute -top-24 -right-24 w-64 h-64 bg-[#E87A2C]/10 rounded-full blur-3xl transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`} />
 
             <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${isPlaying ? 'bg-[#E87A2C] text-white animate-pulse' : 'bg-white/5 text-stone-500'}`}>
-                        <Zap className="w-4 h-4" />
+                <div className="flex items-center gap-2 md:gap-3">
+                    <div className={`p-1.5 md:p-2 rounded-lg md:rounded-xl ${isPlaying ? 'bg-[#E87A2C] text-white animate-pulse' : 'bg-white/5 text-stone-500'}`}>
+                        <Zap className="w-3 h-3 md:w-4 md:h-4" />
                     </div>
                     <div>
-                        <h3 className="font-black uppercase text-[10px] tracking-[0.3em] text-white">Batida v3</h3>
-                        <p className="text-[8px] font-bold text-[#E87A2C] uppercase tracking-widest">Até 500 BPM</p>
+                        <h3 className="font-black uppercase text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] text-white">Metrônomo</h3>
+                        <p className="text-[7px] md:text-[8px] font-bold text-[#E87A2C] uppercase tracking-widest">v4 Mobile</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
                     <button
                         onClick={() => setHasAccent(!hasAccent)}
-                        className={`p-3 rounded-2xl transition-all ${hasAccent ? 'bg-[#E87A2C]/20 text-[#E87A2C]' : 'bg-white/5 text-stone-600'}`}
-                        title={hasAccent ? "Com Acento no 1º Tempo" : "Sem Acento"}
+                        className={`p-2.5 md:p-3 rounded-xl md:rounded-2xl transition-all ${hasAccent ? 'bg-[#E87A2C]/20 text-[#E87A2C]' : 'bg-white/5 text-stone-600'}`}
                     >
-                        {hasAccent ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                        {hasAccent ? <Bell className="w-4 h-4 md:w-5 md:h-5" /> : <BellOff className="w-4 h-4 md:w-5 md:h-5" />}
                     </button>
-                    <div className="flex bg-white/5 rounded-[20px] p-1.5 border border-white/10">
+                    <div className="flex bg-white/5 rounded-[16px] md:rounded-[20px] p-1 border border-white/10">
                         <button
                             onClick={() => setMode('click')}
-                            className={`px-5 py-2.5 rounded-[14px] text-[10px] font-black uppercase transition-all ${mode === 'click' ? 'bg-[#E87A2C] text-white shadow-xl' : 'text-stone-500 hover:text-stone-300'}`}
+                            className={`px-3 md:px-5 py-2 md:py-2.5 rounded-[12px] md:rounded-[14px] text-[8px] md:text-[10px] font-black uppercase transition-all ${mode === 'click' ? 'bg-[#E87A2C] text-white shadow-xl' : 'text-stone-500 hover:text-stone-300'}`}
                         >
                             Click
                         </button>
                         <button
                             onClick={() => setMode('voice')}
-                            className={`px-5 py-2.5 rounded-[14px] text-[10px] font-black uppercase transition-all ${mode === 'voice' ? 'bg-[#E87A2C] text-white shadow-xl' : 'text-stone-500 hover:text-stone-300'}`}
+                            className={`px-3 md:px-5 py-2 md:py-2.5 rounded-[12px] md:rounded-[14px] text-[8px] md:text-[10px] font-black uppercase transition-all ${mode === 'voice' ? 'bg-[#E87A2C] text-white shadow-xl' : 'text-stone-500 hover:text-stone-300'}`}
                         >
                             Voz
                         </button>
@@ -158,21 +155,21 @@ export const Metronome: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center relative z-10">
-                <div className="flex items-center gap-8">
-                    <button onClick={() => adjustBpm(-10)} className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all">
-                        <Minus className="w-5 h-5" />
+            <div className="flex flex-col items-center justify-center relative z-10 my-2 md:my-0">
+                <div className="flex items-center gap-4 md:gap-8">
+                    <button onClick={() => adjustBpm(-10)} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all">
+                        <Minus className="w-4 h-4 md:w-5 md:h-5" />
                     </button>
 
                     <div className="text-center group cursor-pointer" onClick={() => adjustBpm(0)}>
-                        <span className="text-[140px] font-black text-white tracking-tighter leading-none block select-none group-active:scale-95 transition-transform">
+                        <span className="text-[70px] sm:text-[100px] md:text-[140px] font-black text-white tracking-tighter leading-none block select-none group-active:scale-95 transition-transform">
                             {bpm}
                         </span>
-                        <span className="text-[10px] font-black text-stone-500 uppercase tracking-[0.5em] mt-2 block">BPM</span>
+                        <span className="text-[8px] md:text-[10px] font-black text-stone-500 uppercase tracking-[0.5em] mt-1 md:mt-2 block">BPM</span>
                     </div>
 
-                    <button onClick={() => adjustBpm(10)} className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all">
-                        <Plus className="w-5 h-5" />
+                    <button onClick={() => adjustBpm(10)} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 active:scale-90 transition-all">
+                        <Plus className="w-4 h-4 md:w-5 md:h-5" />
                     </button>
                 </div>
 
@@ -181,18 +178,18 @@ export const Metronome: React.FC = () => {
                     min="1" max="500"
                     value={bpm}
                     onChange={(e) => setBpm(parseInt(e.target.value))}
-                    className="w-full max-w-sm mt-8 h-1 bg-white/5 rounded-lg appearance-none cursor-pointer accent-[#E87A2C]"
+                    className="w-full max-w-xs md:max-w-sm mt-6 md:mt-8 h-1 bg-white/5 rounded-lg appearance-none cursor-pointer accent-[#E87A2C]"
                 />
             </div>
 
-            <div className="flex justify-center gap-4 relative z-10">
+            <div className="flex justify-center gap-3 md:gap-4 relative z-10">
                 {[...Array(timeSignature)].map((_, b) => (
                     <div key={b} onClick={() => { if (b === 0) setHasAccent(!hasAccent); }} className="flex flex-col items-center gap-3 cursor-pointer">
                         <div
                             className={`
-                                w-3 h-3 rounded-full transition-all duration-75
+                                w-2.5 h-2.5 md:w-3 md:h-3 rounded-full transition-all duration-75
                                 ${currentBeat === b
-                                    ? (b === 0 && hasAccent ? 'bg-[#E87A2C] scale-150 shadow-[0_0_20px_rgba(232,122,44,0.6)]' : 'bg-white scale-125')
+                                    ? (b === 0 && hasAccent ? 'bg-[#E87A2C] scale-150 shadow-[0_0_15px_rgba(232,122,44,0.6)]' : 'bg-white scale-125')
                                     : 'bg-white/5 scale-100'}
                             `}
                         />
@@ -200,8 +197,8 @@ export const Metronome: React.FC = () => {
                 ))}
             </div>
 
-            <div className="space-y-6 relative z-10">
-                <div className="flex items-center gap-6 bg-white/5 p-4 rounded-[28px] border border-white/10">
+            <div className="space-y-4 md:space-y-6 relative z-10">
+                <div className="flex items-center gap-4 md:gap-6 bg-white/5 p-3 md:p-4 rounded-[24px] md:rounded-[28px] border border-white/10">
                     <Volume2 className="w-4 h-4 text-stone-500" />
                     <input
                         type="range"
@@ -215,12 +212,12 @@ export const Metronome: React.FC = () => {
                 <button
                     onClick={toggleMetronome}
                     className={`
-                        w-full py-8 rounded-[32px] flex items-center justify-center gap-4 transition-all
+                        w-full py-5 md:py-8 rounded-[28px] md:rounded-[32px] flex items-center justify-center gap-3 md:gap-4 transition-all active:scale-[0.98]
                         ${isPlaying ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-2xl shadow-orange-500/20'}
                     `}
                 >
-                    {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current" />}
-                    <span className="font-black uppercase tracking-[0.2em] text-lg">{isPlaying ? 'PARAR' : 'PLAY'}</span>
+                    {isPlaying ? <Pause className="w-6 h-6 md:w-8 md:h-8 fill-current" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current" />}
+                    <span className="font-black uppercase tracking-[0.2em] text-sm md:text-lg">{isPlaying ? 'PARAR' : 'PLAY'}</span>
                 </button>
             </div>
         </div>

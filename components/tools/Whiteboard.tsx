@@ -25,7 +25,7 @@ export const Whiteboard: React.FC = () => {
     const [history, setHistory] = useState<Stroke[][]>([]);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // Draggable Menu State
+    // Draggable Menu State - Initial position adjusted for space
     const [menuPos, setMenuPos] = useState({ x: 20, y: 20 });
     const isDraggingMenu = useRef(false);
     const dragOffset = useRef({ x: 0, y: 0 });
@@ -97,23 +97,27 @@ export const Whiteboard: React.FC = () => {
     };
 
     const draw = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing || tool !== 'pencil') return;
-        const pos = getPos(e);
-        currentStroke.current.push(pos);
+        if (isDrawing && tool === 'pencil') {
+            const pos = getPos(e);
+            currentStroke.current.push(pos);
 
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!ctx) return;
+            const canvas = canvasRef.current;
+            const ctx = canvas?.getContext('2d');
+            if (!ctx) return;
 
-        ctx.strokeStyle = color;
-        ctx.lineWidth = brushSize;
-        ctx.lineCap = 'round';
-        const lastPoints = currentStroke.current.slice(-2);
-        if (lastPoints.length === 2) {
-            ctx.beginPath();
-            ctx.moveTo(lastPoints[0].x, lastPoints[0].y);
-            ctx.lineTo(lastPoints[1].x, lastPoints[1].y);
-            ctx.stroke();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = brushSize;
+            ctx.lineCap = 'round';
+            const lastPoints = currentStroke.current.slice(-2);
+            if (lastPoints.length === 2) {
+                ctx.beginPath();
+                ctx.moveTo(lastPoints[0].x, lastPoints[0].y);
+                ctx.lineTo(lastPoints[1].x, lastPoints[1].y);
+                ctx.stroke();
+            }
+        } else if (tool === 'eraser') {
+            // Continuous erasing while moving
+            handleErase(e);
         }
     };
 
@@ -132,14 +136,23 @@ export const Whiteboard: React.FC = () => {
         }
     };
 
+    // Improved Hitachi Algorithm for Path Erasing
+    const distToSegment = (p: Point, v: Point, w: Point) => {
+        const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+        if (l2 === 0) return Math.sqrt(Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2));
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt(Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + Math.pow(p.y - (v.y + t * (w.y - v.y)), 2));
+    };
+
     const handleErase = (e: React.MouseEvent | React.TouchEvent) => {
         const pos = getPos(e);
-        const threshold = 15; // Deletion sensitivity
+        const threshold = 25; // More forgiving on mobile
 
         const filteredStrokes = strokes.filter(stroke => {
-            // Check if pos is near any point in the stroke
-            const isNear = stroke.points.some(p => {
-                const dist = Math.sqrt(Math.pow(p.x - pos.x, 2) + Math.pow(p.y - pos.y, 2));
+            const isNear = stroke.points.some((p, i) => {
+                if (i === 0) return false;
+                const dist = distToSegment(pos, stroke.points[i - 1], p);
                 return dist < threshold;
             });
             return !isNear;
@@ -172,10 +185,9 @@ export const Whiteboard: React.FC = () => {
             format: [canvasRef.current.width, canvasRef.current.height]
         });
         pdf.addImage(imgData, 'PNG', 0, 0, canvasRef.current.width, canvasRef.current.height);
-        pdf.save(`aula-v3-${Date.now()}.pdf`);
+        pdf.save(`aula-v4-mobile-${Date.now()}.pdf`);
     };
 
-    // DRAG LOGIC for Menu
     const onMenuMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
         isDraggingMenu.current = true;
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -189,12 +201,15 @@ export const Whiteboard: React.FC = () => {
     useEffect(() => {
         const onMouseMove = (e: MouseEvent | TouchEvent) => {
             if (!isDraggingMenu.current) return;
-            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-            const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-            setMenuPos({
-                x: clientX - dragOffset.current.x,
-                y: clientY - dragOffset.current.y
-            });
+            const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+
+            // Constrain within screen
+            const padding = 10;
+            const x = Math.max(padding, Math.min(window.innerWidth - 200, clientX - dragOffset.current.x));
+            const y = Math.max(padding, Math.min(window.innerHeight - 80, clientY - dragOffset.current.y));
+
+            setMenuPos({ x, y });
         };
         const onMouseUp = () => { isDraggingMenu.current = false; };
 
@@ -208,7 +223,7 @@ export const Whiteboard: React.FC = () => {
             window.removeEventListener('touchmove', onMouseMove);
             window.removeEventListener('touchend', onMouseUp);
         };
-    }, [menuPos]);
+    }, []);
 
     const toggleFullscreen = () => {
         if (!containerRef.current) return;
@@ -222,7 +237,7 @@ export const Whiteboard: React.FC = () => {
     };
 
     return (
-        <div ref={containerRef} className={`relative w-full bg-white transition-all duration-500 overflow-hidden group ${isFullscreen ? 'h-screen' : 'h-full rounded-[48px] border border-stone-100 shadow-2xl'}`}>
+        <div ref={containerRef} className={`relative w-full bg-white transition-all duration-500 overflow-hidden group ${isFullscreen ? 'h-screen' : 'h-full rounded-[32px] md:rounded-[48px] border border-stone-100 shadow-2xl'}`}>
             <canvas
                 ref={canvasRef}
                 onMouseDown={startDrawing}
@@ -235,58 +250,59 @@ export const Whiteboard: React.FC = () => {
                 className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
             />
 
-            {/* DRAGGABLE CONTROL BAR */}
+            {/* SLIM HORIZONTAL BAR */}
             <div
                 style={{ left: menuPos.x, top: menuPos.y }}
-                className="absolute z-50 flex flex-col md:flex-row items-center gap-4 bg-[#0F0A09]/90 backdrop-blur-xl p-3 rounded-[32px] border border-white/10 shadow-3xl select-none"
+                className="absolute z-50 flex items-center gap-1.5 md:gap-3 bg-[#0F0A09]/90 backdrop-blur-xl p-1.5 md:p-2.5 rounded-full border border-white/10 shadow-3xl select-none"
             >
                 <div
                     onMouseDown={onMenuMouseDown}
                     onTouchStart={onMenuMouseDown}
-                    className="p-2 cursor-grab active:cursor-grabbing text-stone-500 hover:text-white transition-colors"
+                    className="p-1 px-2 md:p-2 cursor-grab active:cursor-grabbing text-stone-600 hover:text-white transition-colors"
                 >
-                    <GripHorizontal className="w-5 h-5" />
+                    <GripHorizontal className="w-3.5 h-3.5 md:w-5 md:h-5" />
                 </div>
 
-                <div className="flex gap-2">
-                    <button onClick={() => setTool('pencil')} className={`p-3 rounded-2xl transition-all ${tool === 'pencil' ? 'bg-[#E87A2C] text-white' : 'bg-white/5 text-stone-500 hover:text-white'}`}><Pencil className="w-5 h-5" /></button>
-                    <button onClick={() => setTool('eraser')} className={`p-3 rounded-2xl transition-all ${tool === 'eraser' ? 'bg-[#E87A2C] text-white' : 'bg-white/5 text-stone-500 hover:text-white'}`}><Eraser className="w-5 h-5" /></button>
+                <div className="flex gap-1 md:gap-1.5">
+                    <button onClick={() => setTool('pencil')} className={`p-2 md:p-3 rounded-full transition-all ${tool === 'pencil' ? 'bg-[#E87A2C] text-white shadow-lg' : 'bg-white/5 text-stone-500'}`}><Pencil className="w-3.5 h-3.5 md:w-5 md:h-5" /></button>
+                    <button onClick={() => setTool('eraser')} className={`p-2 md:p-3 rounded-full transition-all ${tool === 'eraser' ? 'bg-[#E87A2C] text-white shadow-lg' : 'bg-white/5 text-stone-500'}`}><Eraser className="w-3.5 h-3.5 md:w-5 md:h-5" /></button>
                 </div>
 
-                <div className="w-px h-6 bg-white/10" />
+                <div className="w-px h-5 bg-white/10" />
 
-                <div className="flex gap-2">
-                    {['#1A110D', '#E87A2C', '#EF4444', '#3B82F6', '#10B981'].map(c => (
+                <div className="flex gap-1 md:gap-1.5">
+                    {['#1A110D', '#E87A2C', '#EF4444', '#3B82F6'].map(c => (
                         <button
                             key={c}
                             onClick={() => { setColor(c); setTool('pencil'); }}
-                            className={`w-8 h-8 rounded-full border-2 transition-transform ${color === c && tool === 'pencil' ? 'scale-110 border-white' : 'border-transparent opacity-40'}`}
+                            className={`w-5 h-5 md:w-7 md:h-7 rounded-full border border-white/20 transition-transform ${color === c && tool === 'pencil' ? 'scale-110 border-white ring-2 ring-white/20' : 'opacity-40'}`}
                             style={{ backgroundColor: c }}
                         />
                     ))}
                 </div>
 
-                <div className="flex items-center gap-3 px-2">
-                    <button onClick={() => setBrushSize(prev => Math.max(2, prev - 2))} className="text-stone-500 hover:text-white"><Minus className="w-4 h-4" /></button>
-                    <span className="text-[10px] font-black text-white w-4 text-center">{brushSize}</span>
-                    <button onClick={() => setBrushSize(prev => Math.min(40, prev + 2))} className="text-stone-500 hover:text-white"><Plus className="w-4 h-4" /></button>
+                <div className="w-px h-5 bg-white/10" />
+
+                <div className="flex items-center gap-1.5 md:gap-3 px-1 md:px-2">
+                    <button onClick={() => setBrushSize(prev => Math.max(2, prev - 2))} className="text-stone-500 hover:text-white"><Minus className="w-3 h-3 md:w-4 md:h-4" /></button>
+                    <span className="text-[7px] md:text-[9px] font-black text-white w-2.5 text-center">{brushSize}</span>
+                    <button onClick={() => setBrushSize(prev => Math.min(40, prev + 2))} className="text-stone-500 hover:text-white"><Plus className="w-3 h-3 md:w-4 md:h-4" /></button>
                 </div>
 
-                <div className="w-px h-6 bg-white/10" />
+                <div className="w-px h-5 bg-white/10" />
 
-                <div className="flex gap-2">
-                    <button onClick={undo} className="p-3 bg-white/5 text-stone-400 rounded-2xl hover:text-white"><Undo className="w-5 h-5" /></button>
-                    <button onClick={clearCanvas} className="p-3 bg-red-500/20 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white"><Trash2 className="w-5 h-5" /></button>
-                    <button onClick={toggleFullscreen} className="p-3 bg-white/5 text-stone-400 rounded-2xl hover:text-white">
-                        <Maximize className="w-5 h-5" />
+                <div className="flex gap-1 md:gap-1.5">
+                    <button onClick={undo} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white"><Undo className="w-3.5 h-3.5 md:w-5 md:h-5" /></button>
+                    <button onClick={clearCanvas} className="p-2 md:p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white"><Trash2 className="w-3.5 h-3.5 md:w-5 md:h-5" /></button>
+                    <button onClick={toggleFullscreen} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white max-md:hidden">
+                        <Maximize className="w-3.5 h-3.5 md:w-5 md:h-5" />
                     </button>
-                    <button onClick={exportToPDF} className="p-3 bg-[#E87A2C] text-white rounded-2xl shadow-xl shadow-orange-500/20"><Download className="w-5 h-5" /></button>
+                    <button onClick={exportToPDF} className="p-2 md:p-3 bg-[#E87A2C] text-white rounded-full shadow-lg"><Download className="w-3.5 h-3.5 md:w-5 md:h-5" /></button>
                 </div>
             </div>
 
-            {/* Grid Helper - Optional visual flair */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0"
-                style={{ backgroundImage: 'radial-gradient(#000 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.02] z-0"
+                style={{ backgroundImage: 'radial-gradient(#000 0.5px, transparent 0.5px)', backgroundSize: '15px 15px' }}
             />
         </div>
     );
