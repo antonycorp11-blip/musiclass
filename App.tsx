@@ -251,6 +251,22 @@ const App: React.FC = () => {
     setIsAddingStudent(false);
   };
 
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (window.confirm("Deseja realmente excluir esta aula permanentemente do histórico?")) {
+      setLoading(true);
+      try {
+        const { error } = await supabase.from('mc_lesson_history').delete().eq('id', lessonId);
+        if (error) throw error;
+        await fetchInitialData();
+      } catch (error) {
+        console.error("Erro ao excluir aula:", error);
+        alert("Erro ao excluir aula do servidor.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -986,6 +1002,15 @@ const App: React.FC = () => {
                           >
                             Abrir Aula
                           </button>
+                          {(currentUser?.role === 'director' || h.teacher_id === currentUser?.id) && (
+                            <button
+                              onClick={() => handleDeleteLesson(h.id)}
+                              className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border border-red-100"
+                              title="Excluir Aula"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

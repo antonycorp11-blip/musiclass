@@ -347,7 +347,7 @@ export const Whiteboard: React.FC = () => {
                     </button>
                     <button onClick={undo} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white hover:bg-white/10 transition-all"><Undo className="w-4 h-4 md:w-5 md:h-5" /></button>
                     <button onClick={clearCanvas} className="p-2 md:p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4 md:w-5 md:h-5" /></button>
-                    <button onClick={toggleFullscreen} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white transition-all max-md:hidden">
+                    <button onClick={toggleFullscreen} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white transition-all">
                         <Monitor className="w-4 h-4 md:w-5 md:h-5" />
                     </button>
                     <button onClick={exportToPDF} className="p-2 md:p-3 bg-[#E87A2C] text-white rounded-full shadow-xl hover:scale-105 transition-transform"><Download className="w-4 h-4 md:w-5 md:h-5" /></button>
