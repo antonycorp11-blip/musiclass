@@ -92,10 +92,11 @@ export const Tuner: React.FC = () => {
         if (!targetFrequency || !pitch || !lockedNote) return null;
 
         const diff = pitch - targetFrequency;
-        if (Math.abs(diff) < 1.5) return { type: 'match' };
+        const absDiff = Math.abs(diff);
+        if (absDiff < 1.0) return { type: 'match' };
 
-        if (diff < 0) return { type: 'up', color: 'text-green-500', label: 'SUBA ↑' };
-        if (diff > 0) return { type: 'down', color: 'text-red-500', label: 'BAIXE ↓' };
+        if (diff < 0) return { type: 'up', color: 'text-green-500', label: 'SUBA ↑', intensity: Math.min(absDiff / 10, 1) };
+        if (diff > 0) return { type: 'down', color: 'text-red-500', label: 'BAIXE ↓', intensity: Math.min(absDiff / 10, 1) };
 
         return null;
     };
@@ -106,97 +107,125 @@ export const Tuner: React.FC = () => {
         if (!pitch) return 50;
         const midi = 12 * (Math.log2(pitch / 440)) + 69;
         const dev = (midi - Math.round(midi)) * 100;
-        return Math.min(100, Math.max(0, 50 + (dev)));
+        return Math.min(100, Math.max(0, 50 + (dev / 2))); // Slightly narrowed sensitivity for better visual UX
     };
 
     return (
-        <div className="bg-[#0F0A09] p-6 md:p-10 rounded-[40px] md:rounded-[48px] border border-white/5 shadow-2xl h-full flex flex-col justify-between overflow-hidden relative">
-            <div className={`absolute inset-0 bg-green-500/5 transition-opacity duration-300 ${feedback?.type === 'match' ? 'opacity-100' : 'opacity-0'}`} />
+        <div className="bg-[#0F0A09] p-6 lg:p-12 rounded-[40px] lg:rounded-[64px] border border-white/5 shadow-2xl h-full flex flex-col justify-between overflow-hidden relative transition-colors duration-500">
+            {/* Dynamic Chromatic Feedback Layer */}
+            <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${feedback?.type === 'match' ? 'bg-green-500/10 opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${feedback?.type === 'up' ? 'bg-green-500/5 opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${feedback?.type === 'down' ? 'bg-red-500/5 opacity-100' : 'opacity-0'}`} />
 
-            <div className="flex flex-col sm:flex-row items-center justify-between relative z-10 gap-4">
-                <div className="flex items-center gap-3">
-                    <Activity className={`w-4 h-4 md:w-5 md:h-5 ${isListening ? 'text-[#E87A2C] animate-pulse' : 'text-stone-800'}`} />
-                    <h3 className="font-black uppercase text-[8px] md:text-[10px] tracking-[0.2em] md:tracking-[0.3em] text-stone-500">Afinador</h3>
+            <div className="flex flex-col sm:flex-row items-center justify-between relative z-10 gap-6">
+                <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl ${isListening ? 'bg-[#E87A2C]/20 border border-[#E87A2C]/40' : 'bg-white/5 border border-white/10'}`}>
+                        <Activity className={`w-6 h-6 ${isListening ? 'text-[#E87A2C] animate-pulse' : 'text-stone-700'}`} />
+                    </div>
+                    <div>
+                        <h3 className="font-black uppercase text-[10px] md:text-sm tracking-[0.4em] text-stone-500">Afinador v5</h3>
+                        {isListening && <p className="text-[8px] md:text-[10px] text-[#E87A2C] font-bold uppercase tracking-widest mt-0.5 animate-fade-in">Escutando...</p>}
+                    </div>
                 </div>
 
                 <button
                     onClick={handleLock}
                     disabled={!isListening}
                     className={`
-                        px-4 md:px-8 py-2 md:py-3 rounded-full text-[7px] md:text-[10px] font-black uppercase transition-all flex items-center gap-2
-                        ${lockedNote ? 'bg-red-500 text-white shadow-xl shadow-red-500/20' : 'bg-white/5 text-stone-600 hover:text-white'}
+                        px-8 py-4 rounded-full text-[10px] md:text-xs font-black uppercase transition-all flex items-center gap-3 backdrop-blur-md
+                        ${lockedNote ? 'bg-red-600 text-white shadow-2xl shadow-red-600/30' : 'bg-white/5 text-stone-500 hover:text-white border border-white/10'}
                     `}
                 >
-                    {lockedNote ? <Lock className="w-2.5 h-2.5 md:w-3 md:h-3" /> : <Unlock className="w-2.5 h-2.5 md:w-3 md:h-3" />}
+                    {lockedNote ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                     {lockedNote ? `TRAVADO EM ${lockedNote}` : 'TRAVAR NOTA'}
                 </button>
             </div>
 
-            <div className="flex-grow flex items-center justify-center relative z-10">
-                <div className="flex items-center justify-center gap-4 sm:gap-8 md:gap-16 w-full max-w-4xl">
-                    <div className="w-16 sm:w-24 md:w-32 flex justify-end">
+            <div className="flex-grow flex items-center justify-center relative z-10 py-10">
+                <div className="flex items-center justify-center gap-8 md:gap-24 lg:gap-40 w-full max-w-7xl">
+                    {/* Left Directional Indicator (DESCER) */}
+                    <div className="w-40 flex justify-end">
                         {feedback?.type === 'down' && (
                             <div className="flex flex-col items-center animate-pulse">
-                                <ChevronLeft className="w-12 h-12 sm:w-16 sm:h-16 md:w-24 md:h-24 text-red-500" />
-                                <span className="text-red-500 font-black text-[7px] md:text-xs uppercase tracking-widest leading-none mt-1">BAIXE</span>
+                                <ChevronLeft className="w-24 h-24 md:w-40 md:h-40 xl:w-56 xl:h-56 text-red-500 transition-transform hover:scale-110" />
+                                <span className="text-red-500 font-black text-xs md:text-lg uppercase tracking-[0.5em] leading-none -mt-4">BAIXE</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="text-center">
-                        <div className={`text-[80px] sm:text-[150px] md:text-[250px] font-black leading-none tracking-tighter transition-all duration-300 ${feedback?.type === 'match' ? 'text-green-500 scale-110' : 'text-white'}`}>
+                    <div className="text-center relative">
+                        {/* Perfect Match Ring */}
+                        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] border-[20px] rounded-full border-green-500/0 transition-all duration-700 ${feedback?.type === 'match' ? 'border-green-500/20 scale-100 opacity-100' : 'scale-150 opacity-0'}`} />
+
+                        <div className={`text-[120px] sm:text-[220px] md:text-[350px] lg:text-[450px] font-black leading-none tracking-tighter transition-all duration-300 drop-shadow-[0_0_50px_rgba(255,255,255,0.05)] ${feedback?.type === 'match' ? 'text-green-500 scale-105' : 'text-white'}`}>
                             {note || '--'}
                         </div>
-                        <div className="flex flex-col gap-0.5 md:gap-1 mt-2 md:mt-4">
-                            <span className="text-lg md:text-3xl font-black text-[#E87A2C] tabular-nums tracking-tighter">
-                                {pitch ? `${pitch.toFixed(1)}` : '0.0'} <small className="text-[8px] md:text-[10px] text-stone-600">Hz</small>
+
+                        <div className="flex flex-col items-center gap-1 mt-2 md:mt-0">
+                            <span className="text-2xl md:text-4xl lg:text-6xl font-black text-[#E87A2C] tabular-nums tracking-tighter drop-shadow-lg">
+                                {pitch ? `${pitch.toFixed(1)}` : '0.0'} <small className="text-xs md:text-sm lg:text-lg text-stone-600 uppercase font-black">Hz</small>
                             </span>
                             {targetFrequency && (
-                                <span className="text-[7px] md:text-[10px] font-bold text-stone-700 uppercase tracking-[0.2em] md:tracking-[0.4em]">
-                                    Alvo: {targetFrequency.toFixed(1)}
-                                </span>
+                                <div className="mt-2 px-6 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-sm">
+                                    <span className="text-[9px] md:text-[11px] font-black text-stone-600 uppercase tracking-[0.4em]">
+                                        Nota Alvo: {targetFrequency.toFixed(1)} Hz
+                                    </span>
+                                </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="w-16 sm:w-24 md:w-32 flex justify-start">
+                    {/* Right Directional Indicator (SUBIR) */}
+                    <div className="w-40 flex justify-start">
                         {feedback?.type === 'up' && (
                             <div className="flex flex-col items-center animate-pulse">
-                                <ChevronRight className="w-12 h-12 sm:w-16 sm:h-16 md:w-24 md:h-24 text-green-500" />
-                                <span className="text-green-500 font-black text-[7px] md:text-xs uppercase tracking-widest leading-none mt-1">SUBA</span>
+                                <ChevronRight className="w-24 h-24 md:w-40 md:h-40 xl:w-56 xl:h-56 text-green-500 transition-transform hover:scale-110" />
+                                <span className="text-green-500 font-black text-xs md:text-lg uppercase tracking-[0.5em] leading-none -mt-4">SUBA</span>
                             </div>
                         )}
                         {feedback?.type === 'match' && (
                             <div className="flex flex-col items-center animate-bounce">
-                                <Check className="w-12 h-12 sm:w-16 sm:h-16 md:w-24 md:h-24 text-green-500" />
-                                <span className="text-green-500 font-black text-[7px] md:text-xs uppercase tracking-widest leading-none mt-1">OK</span>
+                                <Check className="w-24 h-24 md:w-40 md:h-40 xl:w-56 xl:h-56 text-green-500" />
+                                <span className="text-green-500 font-black text-xs md:text-lg uppercase tracking-[0.5em] leading-none -mt-4">OK!</span>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            <div className="relative z-10 space-y-4 md:space-y-8">
-                <div className="w-full h-1.5 md:h-2 bg-white/5 rounded-full relative overflow-hidden">
-                    <div className="absolute left-1/2 -translate-x-1/2 w-0.5 md:w-1 h-full bg-white/10 z-0" />
+            <div className="relative z-10 space-y-8 lg:space-y-12 pb-4">
+                {/* Enhanced Needle Meter */}
+                <div className="w-full h-3 md:h-5 bg-white/5 rounded-full relative overflow-hidden ring-1 ring-white/10">
+                    <div className="absolute left-1/4 w-px h-full bg-white/5" />
+                    <div className="absolute left-1/2 -translate-x-1/2 w-0.5 md:w-1 h-full bg-[#E87A2C]/30 z-0" />
+                    <div className="absolute left-3/4 w-px h-full bg-white/5" />
+
                     <div
-                        className={`absolute top-0 w-1 md:w-1.5 h-full transition-all duration-150 ${feedback?.type === 'match' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-[#E87A2C]'}`}
+                        className={`absolute top-0 w-2 md:w-3 h-full transition-all duration-150 ${feedback?.type === 'match' ? 'bg-green-500 shadow-[0_0_25px_#22c55e]' : 'bg-[#E87A2C]'}`}
                         style={{ left: `${getDeviationPx()}%`, transform: 'translateX(-50%)' }}
                     />
                 </div>
 
-                <button
-                    onClick={isListening ? stopRecording : startRecording}
-                    className={`
-                        w-full py-5 md:py-8 rounded-[28px] md:rounded-[32px] flex items-center justify-center gap-3 md:gap-4 transition-all active:scale-[0.98]
-                        ${isListening ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-2xl shadow-orange-500/20'}
-                    `}
-                >
-                    {isListening ? <MicOff className="w-6 h-6 md:w-8 md:h-8" /> : <Mic className="w-6 h-6 md:w-8 md:h-8" />}
-                    <span className="font-black uppercase tracking-[0.2em] text-sm md:text-lg">
-                        {isListening ? 'PARAR ESCUTA' : 'OUVIR NOTA'}
-                    </span>
-                </button>
+                <div className="max-w-4xl mx-auto w-full">
+                    <button
+                        onClick={isListening ? stopRecording : startRecording}
+                        className={`
+                            w-full py-6 md:py-10 rounded-[32px] md:rounded-[48px] flex items-center justify-center gap-6 transition-all active:scale-[0.98] shadow-2xl relative overflow-hidden group
+                            ${isListening ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-orange-500/20'}
+                        `}
+                    >
+                        <div className={`absolute inset-0 bg-white/20 transition-transform duration-500 translate-y-full group-hover:translate-y-0 ${!isListening && 'bg-black/10'}`} />
+                        {isListening ? <MicOff className="w-8 h-8 md:w-10 md:h-10 relative z-10" /> : <Mic className="w-8 h-8 md:w-10 md:h-10 relative z-10" />}
+                        <span className="font-black uppercase tracking-[0.3em] text-lg md:text-2xl relative z-10">
+                            {isListening ? 'ENCERRAR ESCUTA' : 'INICIAR MONITORAMENTO'}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Visual Guide Label */}
+            <div className="absolute bottom-6 left-12 opacity-30 select-none">
+                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-stone-600">MusiClass Audio Precision Engine v5.0</span>
             </div>
         </div>
     );
