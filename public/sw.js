@@ -1,17 +1,23 @@
-const CACHE_NAME = 'musiclass-v3';
+const CACHE_NAME = 'musiclass-v6-exterminator';
 
 self.addEventListener('install', (event) => {
+    self.skipWaiting(); // Força o novo SW a assumir imediatamente
+});
+
+self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(['/', '/index.html']);
-        })
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    console.log('Deletando cache antigo:', cacheName);
+                    return caches.delete(cacheName);
+                })
+            );
+        }).then(() => self.clients.claim()) // Assume controle das abas abertas imediatamente
     );
 });
 
 self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        fetch(event.request).catch(() => {
-            return caches.match(event.request);
-        })
-    );
+    // Modo transparente: Não intercepta nada, deixa passar para a rede
+    return;
 });

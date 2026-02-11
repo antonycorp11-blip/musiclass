@@ -15,6 +15,9 @@
     <meta name="theme-color" content="#1A110D">
 
     <script>
+        // Teste de carga síncrono - Deve disparar antes de tudo
+        alert("SISTEMA MUSICLASS V6: Verificando integridade...");
+
         window.onerror = function (msg, url, lineNo, columnNo, error) {
             var message = [
                 'Mensagem: ' + msg,
@@ -78,12 +81,12 @@
         }
 
         // Executa a limpeza se for a primeira vez nesta versão
-        const RESET_VERSION = 'v5_hard_reset';
+        const RESET_VERSION = 'v6_force_reload';
         if (localStorage.getItem('system_reset_version') !== RESET_VERSION) {
+            alert("Limpando memória antiga do tablet... Por favor, aguarde.");
             clearAllSystemCache().then(() => {
                 localStorage.setItem('system_reset_version', RESET_VERSION);
-                // Não recarregamos automaticamente para evitar loop, 
-                // o navegador usará o novo script nas próximas requisições.
+                location.reload(true); // RECARGA FORÇADA
             });
         }
     </script>
@@ -97,7 +100,7 @@
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <h1
                         style="color: #1A110D; margin: 0; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; font-style: italic;">
-                        MusiClass</h1>
+                        MUSICLASS V6</h1>
                     <p
                         style="text-transform: uppercase; font-weight: 700; letter-spacing: 4px; font-size: 8px; color: #E87A2C; opacity: 0.8;">
                         Educational Ecosystem</p>
