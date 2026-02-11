@@ -36,25 +36,38 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
     const handleDownloadImage = async () => {
         if (!documentRef.current) return;
-        setIsExporting(true);
+        try {
+            console.log('Iniciando exportação de imagem...');
+            if ((window as any).logDebug) (window as any).logDebug('Exportando PNG...');
+            setIsExporting(true);
 
-        const canvas = await html2canvas(documentRef.current, {
-            scale: 5, // Ultra High Quality
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: 1200,
-        });
+            const canvas = await html2canvas(documentRef.current, {
+                scale: 3, // High quality, lower memory usage than 5
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: true,
+                windowWidth: 1200,
+            });
 
-        const link = document.createElement('a');
-        link.download = `${studentName} - ${instrument} - ${today} - ${teacherName}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
+            console.log('Canvas gerado, criando link...');
+            const link = document.createElement('a');
+            link.download = `${studentName} - ${instrument} - ${today} - ${teacherName}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
 
-        // Save to backend ONLY on export
-        if (onExport) await onExport();
+            if (onExport) await onExport();
 
-        link.click();
-        setIsExporting(false);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setIsExporting(false);
+            if ((window as any).logDebug) (window as any).logDebug('Imagem baixada com sucesso.');
+        } catch (error) {
+            console.error('Erro ao baixar imagem:', error);
+            alert('Falha ao gerar imagem: ' + (error instanceof Error ? error.message : String(error)));
+            setIsExporting(false);
+        }
     };
 
     useEffect(() => {
@@ -76,71 +89,71 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
     const handleDownloadPDF = async () => {
         if (!documentRef.current) return;
-        setIsExporting(true);
+        try {
+            console.log('Iniciando exportação de PDF...');
+            if ((window as any).logDebug) (window as any).logDebug('Exportando PDF...');
+            setIsExporting(true);
 
-        // 1. Sync data and upload audios BEFORE generating PDF to get final public URLs
-        if (onExport) {
-            await onExport();
-            // Small delay to ensure state propagation and DOM update
-            await new Promise(r => setTimeout(r, 500));
+            // 1. Sync data and upload audios BEFORE generating PDF
+            if (onExport) {
+                await onExport();
+                await new Promise(r => setTimeout(r, 800)); // Increased wait
+            }
+
+            console.log('Capturando canvas para PDF...');
+            const canvas = await html2canvas(documentRef.current, {
+                scale: 2.5, // Good balance for PDF memory on mobile
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: true,
+                windowWidth: 1200,
+            });
+
+            console.log('Iniciando jsPDF...');
+            const imgData = canvas.toDataURL('image/jpeg', 0.95); // Using JPEG for smaller PDF size
+            const imgWidth = 210;
+            let imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: [imgWidth, imgHeight],
+                compress: true
+            });
+
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+
+            // Mapeamento de Links
+            const cards = documentRef.current.querySelectorAll('.audio-card-pdf');
+            cards.forEach((card) => {
+                const cardElement = card as HTMLElement;
+                const url = cardElement.dataset.url;
+                if (!url) return;
+
+                const rect = cardElement.getBoundingClientRect();
+                const parentRect = documentRef.current!.getBoundingClientRect();
+
+                const relTop = rect.top - parentRect.top;
+                const relLeft = rect.left - parentRect.left;
+
+                const pdfX = (relLeft * 210) / parentRect.width;
+                const pdfY = (relTop * imgHeight) / parentRect.height;
+                const pdfW = (rect.width * 210) / parentRect.width;
+                const pdfH = (rect.height * imgHeight) / parentRect.height;
+
+                pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
+            });
+
+            console.log('Salvando PDF...');
+            pdf.save(`${studentName} - ${instrument} - ${today} - ${teacherName}.pdf`);
+            setIsExporting(false);
+            if ((window as any).logDebug) (window as any).logDebug('PDF baixado com sucesso.');
+        } catch (error) {
+            console.error('Erro ao baixar PDF:', error);
+            alert('Falha ao gerar PDF: ' + (error instanceof Error ? error.message : String(error)));
+            setIsExporting(false);
         }
-
-        const canvas = await html2canvas(documentRef.current, {
-            scale: 5, // Ultra High Resolution
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: 1200, // Simula uma janela maior para garantir que o layout "desktop" (que cabe no A4) seja o capturado
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = 210;
-        const pageHeight = 297;
-
-        // Calculate aspect-ratio safe height
-        let imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        // Create PDF with custom height if it exceeds standard A4 to preserve 1:1 look
-        const pdf = new jsPDF({
-            orientation: 'p',
-            unit: 'mm',
-            format: [imgWidth, imgHeight],
-            compress: true
-        });
-
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-
-        // Mapeamento Blindado de Links (Precisão Cirúrgica)
-        const cards = documentRef.current.querySelectorAll('.audio-card-pdf');
-
-        // Usamos as medidas nominais do A4 para o mapeamento
-        const DOM_A4_WIDTH = 794; // 210mm em pixels (96dpi)
-        const DOM_A4_HEIGHT = documentRef.current.scrollHeight;
-
-        cards.forEach((card) => {
-            const cardElement = card as HTMLElement;
-            const url = cardElement.dataset.url;
-            if (!url) return;
-
-            // Posição relativa ao container pai (documentRef)
-            const rect = cardElement.getBoundingClientRect();
-            const parentRect = documentRef.current!.getBoundingClientRect();
-
-            const relTop = rect.top - parentRect.top;
-            const relLeft = rect.left - parentRect.left;
-
-            // Converter para milímetros no espaço do PDF (usando imgHeight real)
-            const pdfX = (relLeft * 210) / parentRect.width;
-            const pdfY = (relTop * imgHeight) / parentRect.height;
-            const pdfW = (rect.width * 210) / parentRect.width;
-            const pdfH = (rect.height * imgHeight) / parentRect.height;
-
-            pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
-        });
-
-        pdf.save(`${studentName} - ${instrument} - ${today} - ${teacherName}.pdf`);
-        setIsExporting(false);
-        if (onExport) onExport();
     };
 
     return (
