@@ -39,31 +39,14 @@ export const Toolbox: React.FC = () => {
             {/* Tool Container */}
             <div className="relative flex-grow min-h-[500px]">
                 {activeTool === 'metronome' && (
-                    <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="animate-fade-in h-[600px]">
                         <Metronome />
-                        <div className="bg-[#1A110D] p-10 rounded-[32px] text-white flex flex-col justify-center gap-6">
-                            <h4 className="text-xl font-black uppercase tracking-tighter">Dica do Professor</h4>
-                            <p className="text-stone-400 text-sm leading-relaxed">
-                                Use o metrônomo para garantir que o aluno mantenha o pulso estável. O modo <b>VOZ</b> é ideal para iniciantes que ainda estão aprendendo a contar os tempos do compasso.
-                            </p>
-                            <div className="flex gap-4">
-                                <div className="p-4 bg-white/5 rounded-2x border border-white/10 text-[10px] font-bold uppercase tracking-widest">Estabilidade</div>
-                                <div className="p-4 bg-white/5 rounded-2x border border-white/10 text-[10px] font-bold uppercase tracking-widest">Precisão</div>
-                            </div>
-                        </div>
                     </div>
                 )}
 
                 {activeTool === 'timer' && (
-                    <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="animate-fade-in h-[600px]">
                         <Timer />
-                        <div className="bg-[#E87A2C] p-10 rounded-[32px] text-white flex flex-col justify-center gap-6 shadow-xl shadow-orange-500/20">
-                            <h4 className="text-xl font-black uppercase tracking-tighter">Gestão de Tempo</h4>
-                            <p className="text-orange-950/70 text-sm leading-relaxed font-bold">
-                                Cronometre exercícios técnicos para gerar foco total. Recomendo séries de 1 ou 5 minutos para treinos de repetição (loops).
-                            </p>
-                            <div className="w-16 h-1 bg-white/30 rounded-full" />
-                        </div>
                     </div>
                 )}
 

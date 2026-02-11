@@ -2,17 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 
 export const Timer: React.FC = () => {
-    const [seconds, setSeconds] = useState(0); // real time remaining
+    const [seconds, setSeconds] = useState(0);
     const [inputMinutes, setInputMinutes] = useState(2);
     const [inputSeconds, setInputSeconds] = useState(0);
     const [isActive, setIsActive] = useState(false);
-    const [leadIn, setLeadIn] = useState<number | null>(null); // 3, 2, 1 lead in
+    const [leadIn, setLeadIn] = useState<number | null>(null);
     const [initialTime, setInitialTime] = useState(0);
 
     const intervalRef = useRef<number | null>(null);
     const leadInRef = useRef<number | null>(null);
 
-    // Lead-in Logic
     useEffect(() => {
         if (leadIn !== null && leadIn > 0) {
             leadInRef.current = window.setTimeout(() => {
@@ -27,7 +26,6 @@ export const Timer: React.FC = () => {
         };
     }, [leadIn]);
 
-    // Timer Logic
     useEffect(() => {
         if (isActive && seconds > 0) {
             intervalRef.current = window.setInterval(() => {
@@ -50,11 +48,9 @@ export const Timer: React.FC = () => {
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
             osc.frequency.setValueAtTime(880, audioCtx.currentTime);
             gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-
             osc.start();
             osc.stop(audioCtx.currentTime + 1);
         } catch (e) { }
@@ -74,7 +70,7 @@ export const Timer: React.FC = () => {
                 setSeconds(total);
                 setInitialTime(total);
             }
-            setLeadIn(3); // Start lead-in
+            setLeadIn(3);
         }
     };
 
@@ -105,51 +101,48 @@ export const Timer: React.FC = () => {
         }
     };
 
+    const progress = initialTime > 0 ? (seconds / initialTime) * 100 : 0;
+
     return (
         <div className="bg-[#1A110D] p-10 rounded-[48px] border border-white/5 shadow-2xl h-full flex flex-col justify-between overflow-hidden relative">
-            {/* Visual Progress Background */}
-            {isActive && seconds > 0 && (
+            {/* Progress Bar (Persistent) */}
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-white/5 z-20">
                 <div
-                    className="absolute inset-0 bg-[#E87A2C]/5 transition-all duration-1000 ease-linear origin-bottom"
-                    style={{ transform: `scaleY(${seconds / initialTime})` }}
+                    className="h-full bg-[#E87A2C] transition-all duration-1000 ease-linear shadow-[0_0_15px_rgba(232,122,44,0.5)]"
+                    style={{ width: `${progress}%` }}
                 />
-            )}
-
-            <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-3">
-                    <Clock className="w-5 h-5 text-[#E87A2C]" />
-                    <h3 className="font-black uppercase text-[10px] tracking-[0.3em] text-stone-500">Cronômetro de Foco</h3>
-                </div>
-                {isActive && (
-                    <div className="px-3 py-1 bg-red-500 rounded-full animate-pulse text-[8px] font-black text-white uppercase tracking-widest">
-                        Em Execução
-                    </div>
-                )}
             </div>
 
-            <div className="flex-grow flex flex-col items-center justify-center relative z-10 py-10">
+            <div className="flex items-center justify-between relative z-10 pt-4">
+                <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-[#E87A2C]" />
+                    <h3 className="font-black uppercase text-[10px] tracking-[0.3em] text-stone-500">Timer Pro v3</h3>
+                </div>
+            </div>
+
+            <div className="flex-grow flex flex-col items-center justify-center relative z-10">
                 {leadIn !== null ? (
-                    <div className="text-[180px] font-black text-[#E87A2C] leading-none animate-bounce">
-                        {leadIn === 0 ? 'GO!' : leadIn}
+                    <div className="text-[250px] md:text-[350px] font-black text-[#E87A2C] leading-none animate-pulse">
+                        {leadIn === 0 ? 'GO' : leadIn}
                     </div>
                 ) : (
-                    <div className="w-full text-center">
+                    <div className="w-full flex flex-col items-center">
                         {(isActive || seconds > 0) ? (
-                            <div className="text-[160px] md:text-[200px] font-black text-white tracking-tighter leading-none select-none">
+                            <div className="text-[200px] md:text-[300px] lg:text-[400px] font-black text-white tracking-tighter leading-none select-none drop-shadow-2xl">
                                 {formatTime(seconds)}
                             </div>
                         ) : (
-                            <div className="flex items-center justify-center gap-4">
+                            <div className="flex items-center justify-center gap-12">
                                 <div className="flex flex-col items-center">
-                                    <button onClick={() => adjustInput('min', 1)} className="p-2 text-stone-600 hover:text-white transition-colors"><ChevronUp className="w-10 h-10" /></button>
-                                    <span className="text-[120px] font-black text-white leading-none">{inputMinutes.toString().padStart(2, '0')}</span>
-                                    <button onClick={() => adjustInput('min', -1)} className="p-2 text-stone-600 hover:text-white transition-colors"><ChevronDown className="w-10 h-10" /></button>
+                                    <button onClick={() => adjustInput('min', 1)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronUp className="w-16 h-16" /></button>
+                                    <span className="text-[180px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputMinutes.toString().padStart(2, '0')}</span>
+                                    <button onClick={() => adjustInput('min', -1)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronDown className="w-16 h-16" /></button>
                                 </div>
-                                <span className="text-[100px] font-black text-[#E87A2C] animate-pulse">:</span>
+                                <span className="text-[150px] font-black text-[#E87A2C] -mt-10">:</span>
                                 <div className="flex flex-col items-center">
-                                    <button onClick={() => adjustInput('sec', 10)} className="p-2 text-stone-600 hover:text-white transition-colors"><ChevronUp className="w-10 h-10" /></button>
-                                    <span className="text-[120px] font-black text-white leading-none">{inputSeconds.toString().padStart(2, '0')}</span>
-                                    <button onClick={() => adjustInput('sec', -10)} className="p-2 text-stone-600 hover:text-white transition-colors"><ChevronDown className="w-10 h-10" /></button>
+                                    <button onClick={() => adjustInput('sec', 10)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronUp className="w-16 h-16" /></button>
+                                    <span className="text-[180px] md:text-[250px] font-black text-white leading-none tabular-nums">{inputSeconds.toString().padStart(2, '0')}</span>
+                                    <button onClick={() => adjustInput('sec', -10)} className="p-4 text-stone-700 hover:text-[#E87A2C] transition-colors"><ChevronDown className="w-16 h-16" /></button>
                                 </div>
                             </div>
                         )}
@@ -157,25 +150,25 @@ export const Timer: React.FC = () => {
                 )}
             </div>
 
-            <div className="flex gap-4 relative z-10">
+            <div className="flex gap-4 relative z-10 pb-4">
                 <button
                     onClick={handleStart}
                     disabled={leadIn !== null || (seconds === 0 && inputMinutes === 0 && inputSeconds === 0)}
                     className={`
-                        flex-grow py-8 rounded-[32px] flex items-center justify-center gap-3 transition-all active:scale-[0.98]
-                        ${isActive ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-xl shadow-orange-500/10 disabled:opacity-20'}
+                        flex-grow py-8 rounded-[32px] flex items-center justify-center gap-4 transition-all active:scale-[0.98]
+                        ${isActive ? 'bg-white text-black' : 'bg-[#E87A2C] text-white shadow-2xl shadow-orange-500/20 disabled:opacity-10'}
                     `}
                 >
-                    {isActive ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
-                    <span className="font-black uppercase tracking-[0.2em] text-sm">
-                        {isActive ? 'PAUSAR' : (seconds > 0 ? 'RETOMAR' : 'INICIAR TREINO')}
+                    {isActive ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current" />}
+                    <span className="font-black uppercase tracking-[0.2em] text-lg">
+                        {isActive ? 'PAUSAR' : (seconds > 0 ? 'RETOMAR' : 'INICIAR')}
                     </span>
                 </button>
                 <button
                     onClick={resetTimer}
-                    className="aspect-square w-24 flex items-center justify-center bg-white/5 text-stone-600 border border-white/10 rounded-[32px] hover:text-white hover:bg-white/10 transition-all"
+                    className="aspect-square w-24 flex items-center justify-center bg-white/5 text-stone-600 border border-white/10 rounded-[32px] hover:text-white transition-all shadow-xl"
                 >
-                    <RotateCcw className="w-6 h-6" />
+                    <RotateCcw className="w-8 h-8" />
                 </button>
             </div>
         </div>
