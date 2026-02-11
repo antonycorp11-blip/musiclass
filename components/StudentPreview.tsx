@@ -72,7 +72,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
             console.log('Capturando canvas para PDF...');
             const canvas = await html2canvas(element as HTMLElement, {
-                scale: 1.5, // Resolução segura para tablets (evita travamentos)
+                scale: 3.5, // Alta resolução (Top Quality)
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
@@ -81,7 +81,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             });
 
             console.log('Gerando arquivo PDF...');
-            const imgData = canvas.toDataURL('image/jpeg', 0.90);
+            const imgData = canvas.toDataURL('image/png', 1.0); // PNG para máxima nitidez
             const imgWidth = 210;
             let imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -92,7 +92,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 compress: true
             });
 
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
             // Mapeamento Blindado de Links
             const cards = element.querySelectorAll('.audio-card-pdf');
@@ -263,7 +263,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                         <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
                                                                             <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                                 {harmonyNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-none">
+                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
                                                                                         {n.note}
                                                                                     </div>
                                                                                 ))}
@@ -271,7 +271,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                             <div className="h-px bg-stone-200 w-full" />
                                                                             <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                                 {soloNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-none">
+                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
                                                                                         {n.note}
                                                                                     </div>
                                                                                 ))}
@@ -296,7 +296,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                             <div className="space-y-2">
                                                 {exercises.map((ex, i) => (
                                                     <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
-                                                        <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-none">
+                                                        <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-tight">
                                                             {i + 1}
                                                         </div>
                                                         <span className="text-[11px] font-black text-[#3C2415] leading-tight">{ex}</span>
@@ -333,7 +333,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 justify-end flex-grow">
                                                     {scale.notes.map((n: string, ni: number) => (
-                                                        <div key={ni} className="inline-flex items-center justify-center w-9 h-9 bg-white/10 border border-white/10 font-black text-white text-[11px] rounded-xl shadow-lg leading-none">
+                                                        <div key={ni} className="inline-flex items-center justify-center w-9 h-9 bg-white/10 border border-white/10 font-black text-white text-[11px] rounded-xl shadow-lg leading-tight">
                                                             {n}
                                                         </div>
                                                     ))}
@@ -419,7 +419,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                         <p className="text-[8px] font-black text-stone-400 uppercase tracking-widest mb-3">{rud.title}</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {rud.pattern.map((hand: string, sIdx: number) => (
-                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${hand === 'R' ? 'bg-[#E87A2C] text-white' : 'bg-[#1A110D] text-white'} leading-none`}>
+                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${hand === 'R' ? 'bg-[#E87A2C] text-white' : 'bg-[#1A110D] text-white'} leading-tight`}>
                                                                     {hand}
                                                                 </div>
                                                             ))}
@@ -453,7 +453,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                         <Play className="w-5 h-5 fill-current" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-[11px] font-black text-white uppercase tracking-tight leading-none">{rec.title || 'Referência MusiClass'}</p>
+                                                        <p className="text-[11px] font-black text-white uppercase tracking-tight leading-tight">{rec.title || 'Referência MusiClass'}</p>
                                                         <p className="text-[8px] font-bold text-stone-500 uppercase tracking-widest mt-1.5">Clique para ouvir no PDF</p>
                                                     </div>
                                                 </div>
