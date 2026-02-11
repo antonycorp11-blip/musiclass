@@ -190,7 +190,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             {/* Brand & Instrument */}
                             <div className="flex flex-col gap-4">
                                 <div className="flex flex-col gap-2">
-                                    <img src="/Logo Laranja.png" alt="Logo" className="h-10 w-auto object-contain brightness-110 self-start" />
+                                    <img src="/Logo-Laranja.png" alt="Logo" className="h-10 w-auto object-contain brightness-110 self-start" />
                                     <span className="text-[10px] font-black text-white uppercase tracking-tighter italic">MusiClass</span>
                                 </div>
                                 <h1 className="text-xl font-black text-white uppercase tracking-tighter">Prática de {instrument}</h1>

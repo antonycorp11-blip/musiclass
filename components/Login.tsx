@@ -96,7 +96,7 @@ export const Login: React.FC<LoginProps> = ({ teachers, onLogin }) => {
             </div>
 
             <div className="mt-20 flex flex-col items-center opacity-20">
-                <img src="/Logo Laranja.png" alt="Logo" className="h-12 object-contain grayscale" />
+                <img src="/Logo-Laranja.png" alt="Logo" className="h-12 object-contain grayscale" />
                 <p className="text-[10px] font-black uppercase mt-4 tracking-widest leading-none text-[#3C2415]">MusiClass Technology 2024</p>
             </div>
         </div>

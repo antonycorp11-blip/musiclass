@@ -8,6 +8,12 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+// Global error handler for mobile debugging
+window.onerror = (message, source, lineno, colno, error) => {
+  alert(`Erro: ${message}\nLinha: ${lineno}\nErro: ${error}`);
+  return false;
+};
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>

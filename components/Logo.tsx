@@ -7,7 +7,7 @@ export const Logo: React.FC<{ light?: boolean, size?: 'sm' | 'md' | 'lg' }> = ({
     return (
         <div className="flex items-center gap-3 select-none">
             <img
-                src="/Logo Laranja.png"
+                src="/Logo-Laranja.png"
                 alt="MusiClass Logo"
                 className={`${height} w-auto object-contain filter ${light ? 'brightness-110' : ''}`}
                 onError={(e) => {

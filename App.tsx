@@ -87,7 +87,14 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchInitialData();
     const savedUser = localStorage.getItem('music_current_user');
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
+    if (savedUser && savedUser !== 'undefined') {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Failed to parse saved user", e);
+        localStorage.removeItem('music_current_user');
+      }
+    }
 
     // PWA Install Logic
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -1146,7 +1153,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 };
 
