@@ -26,7 +26,8 @@ import {
   MousePointer2,
   Disc,
   Volume2,
-  Activity
+  Activity,
+  Wrench
 } from 'lucide-react';
 
 import * as XLSX from 'xlsx';
@@ -37,6 +38,7 @@ import { MusicEngine } from './services/musicEngine';
 import { ChordVisualizer } from './components/ChordVisualizer';
 import { TabEditor } from './components/TabEditor';
 import { StudentPreview } from './components/StudentPreview';
+import { Toolbox } from './components/Toolbox';
 import { Login } from './components/Login';
 import { SoloEditor } from './components/SoloEditor';
 import { Logo } from './components/Logo';
@@ -45,7 +47,7 @@ import { ManualChordEditor } from './components/ManualChordEditor';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Teacher | null>(null);
-  const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox'>('students');
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -584,6 +586,10 @@ const App: React.FC = () => {
             <Clock className="w-5 h-5" />
             <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Histórico</span>
           </button>
+          <button onClick={() => setActiveTab('toolbox')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'toolbox' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
+            <Wrench className="w-5 h-5" />
+            <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Ferramentas</span>
+          </button>
           {currentUser.role === 'director' && (
             <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
               <LayoutDashboard className="w-5 h-5" />
@@ -1053,6 +1059,15 @@ const App: React.FC = () => {
             </div>
           )
         }
+        {activeTab === 'toolbox' && (
+          <div className="max-w-7xl mx-auto animate-fade-in">
+            <div className="mb-12">
+              <h2 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">MusiClass Toolbox</h2>
+              <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Ferramentas de suporte para a aula</p>
+            </div>
+            <Toolbox />
+          </div>
+        )}
       </main>
 
       {isPreviewing && selectedStudent && (

@@ -12,8 +12,9 @@
     "@google/genai": "^1.38.0",
     "@supabase/supabase-js": "^2.91.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.1.0",
     "lucide-react": "^0.562.0",
+    "pitchy": "^4.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "xlsx": "^0.18.5"
