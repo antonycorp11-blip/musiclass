@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
       target: 'es2015',
     },
     define: {
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || 'https://wayigtlilhvutbfvxgae.supabase.co'),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_YP9wwSLwb5yIl6mX9ebAmg_IB3xDd4L'),
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
     },

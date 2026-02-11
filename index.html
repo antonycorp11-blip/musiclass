@@ -38,13 +38,6 @@
         window.addEventListener('unhandledrejection', function (event) {
             alert("PROMESSA REJEITADA:\n" + event.reason);
         });
-
-        // Teste de suporte moderno
-        try {
-            eval('import.meta');
-        } catch (e) {
-            alert("ERRO CRÍTICO:\nSeu navegador não suporta 'import.meta', necessário para rodar este app. Use uma versão recente do Chrome.");
-        }
     </script>
 
 
