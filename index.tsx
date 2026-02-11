@@ -10,9 +10,13 @@ if (!rootElement) {
 
 // Global error handler for mobile debugging
 window.onerror = (message, source, lineno, colno, error) => {
-  alert(`Erro: ${message}\nLinha: ${lineno}\nErro: ${error}`);
+  const msg = `Erro: ${message}\nLinha: ${lineno}\nErro: ${error}`;
+  if ((window as any).logDebug) (window as any).logDebug(msg);
+  alert(msg);
   return false;
 };
+
+if ((window as any).logDebug) (window as any).logDebug('Entrando no index.tsx');
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
@@ -20,6 +24,8 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+if ((window as any).logDebug) (window as any).logDebug('React.render chamado');
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {

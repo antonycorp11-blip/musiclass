@@ -11,6 +11,39 @@
     <link rel="apple-touch-icon" href="/assets/icon-512.png">
     <meta name="theme-color" content="#1A110D">
 
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            var message = [
+                'Mensagem: ' + msg,
+                'URL: ' + url,
+                'Linha: ' + lineNo,
+                'Coluna: ' + columnNo,
+                'Erro object: ' + JSON.stringify(error)
+            ].join('\n');
+            alert("ERRO DETECTADO:\n" + message);
+            return false;
+        };
+
+        // Redireciona console.log para o debug-log na tela
+        var oldLog = console.log;
+        console.log = function () {
+            var args = Array.prototype.slice.call(arguments);
+            if (window.logDebug) window.logDebug('LOG: ' + args.join(' '));
+            oldLog.apply(console, arguments);
+        };
+
+        window.addEventListener('unhandledrejection', function (event) {
+            alert("PROMESSA REJEITADA:\n" + event.reason);
+        });
+
+        // Teste de suporte moderno
+        try {
+            eval('import.meta');
+        } catch (e) {
+            alert("ERRO CRÍTICO:\nSeu navegador não suporta 'import.meta', necessário para rodar este app. Use uma versão recente do Chrome.");
+        }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -22,8 +55,30 @@
 </head>
 
 <body class="bg-gray-50 text-gray-900">
-    <div id="root"></div>
+    <div id="root">
+        <div
+            style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1A110D; color: white; font-family: sans-serif; text-align: center; padding: 20px;">
+            <div>
+                <h1 style="color: #E87A2C;">MusiClass</h1>
+                <p id="boot-status">Iniciando sistema no tablet...</p>
+                <div id="debug-log"
+                    style="font-size: 8px; opacity: 0.5; margin-top: 20px; white-space: pre-wrap; text-align: left; max-width: 300px; overflow: auto; max-height: 100px;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function logDebug(msg) {
+            var el = document.getElementById('debug-log');
+            if (el) el.innerHTML += msg + '\n';
+        }
+        logDebug('Boot iniciado ' + new Date().toLocaleTimeString());
+    </script>
     <script type="module" src="/index.tsx"></script>
+    <script nomodule>
+        alert("SEU TABLET É ANTIGO DEMAIS:\nEste navegador não suporta 'JavaScript Modules'. Por favor, tente atualizar o tablet ou usar o Google Chrome mais recente.");
+    </script>
 </body>
 
 </html>

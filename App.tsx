@@ -547,7 +547,7 @@ const App: React.FC = () => {
 
   const teacherStudents = students.filter(s => s.teacher_id === currentUser?.id || currentUser?.role === 'director');
 
-  if (loading && !currentUser) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#1A110D] flex items-center justify-center">
         <div className="flex flex-col items-center gap-6">
