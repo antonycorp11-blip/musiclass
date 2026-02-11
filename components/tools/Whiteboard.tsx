@@ -118,6 +118,9 @@ export const Whiteboard: React.FC = () => {
         return { x: clientX - rect.left, y: clientY - rect.top };
     };
 
+    const [showBrushSize, setShowBrushSize] = useState(false);
+    const holdTimer = useRef<NodeJS.Timeout | null>(null);
+
     const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
         if (tool === 'pencil') {
             setIsDrawing(true);
@@ -144,7 +147,16 @@ export const Whiteboard: React.FC = () => {
 
             // Real-time smooth preview
             const points = currentStroke.current;
-            if (points.length < 3) return;
+            if (points.length < 3) {
+                // For very short strokes, draw a simple line for preview
+                if (points.length === 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    ctx.lineTo(points[1].x, points[1].y);
+                    ctx.stroke();
+                }
+                return;
+            }
 
             const last = points[points.length - 1];
             const prev = points[points.length - 2];
@@ -167,9 +179,17 @@ export const Whiteboard: React.FC = () => {
 
     const stopDrawing = () => {
         if (isDrawing) {
+            let points = currentStroke.current;
+
+            // POINT SENSITIVITY: If it's just a tap (1 point) or very short, make it a visible dot
+            if (points.length <= 2) {
+                const p = points[0];
+                points = [p, { x: p.x + 0.1, y: p.y + 0.1 }];
+            }
+
             const newStroke: Stroke = {
                 id: Date.now(),
-                points: currentStroke.current,
+                points,
                 color,
                 size: brushSize
             };
@@ -180,36 +200,17 @@ export const Whiteboard: React.FC = () => {
         }
     };
 
-    const distToSegment = (p: Point, v: Point, w: Point) => {
-        const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
-        if (l2 === 0) return Math.sqrt(Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2));
-        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-        t = Math.max(0, Math.min(1, t));
-        return Math.sqrt(Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + Math.pow(p.y - (v.y + t * (w.y - v.y)), 2));
+    const handlePenHoldStart = () => {
+        holdTimer.current = setTimeout(() => {
+            setShowBrushSize(prev => !prev);
+        }, 500);
     };
 
-    const handleErase = (e: React.MouseEvent | React.TouchEvent) => {
-        const pos = getPos(e);
-        const threshold = 25;
-
-        const filteredStrokes = strokes.filter(stroke => {
-            const isNear = stroke.points.some((p, i) => {
-                if (i === 0) return false;
-                return distToSegment(pos, stroke.points[i - 1], p) < threshold;
-            });
-            return !isNear;
-        });
-
-        if (filteredStrokes.length !== strokes.length) {
-            setHistory(prev => [...prev, strokes].slice(-20));
-            setStrokes(filteredStrokes);
+    const handlePenHoldEnd = () => {
+        if (holdTimer.current) {
+            clearTimeout(holdTimer.current);
+            holdTimer.current = null;
         }
-    };
-
-    const undo = () => {
-        if (history.length === 0) return;
-        setStrokes(history[history.length - 1]);
-        setHistory(prev => prev.slice(0, -1));
     };
 
     const clearCanvas = () => {
@@ -220,7 +221,6 @@ export const Whiteboard: React.FC = () => {
     const exportToPDF = () => {
         if (!canvasRef.current) return;
 
-        // Temporarily clear grid for PDF
         redraw();
 
         const imgData = canvasRef.current.toDataURL('image/png');
@@ -230,7 +230,6 @@ export const Whiteboard: React.FC = () => {
             format: [canvasRef.current.width, canvasRef.current.height]
         });
 
-        // Add bgColor if blackboard
         if (theme === 'blackboard') {
             pdf.setFillColor(15, 10, 9);
             pdf.rect(0, 0, canvasRef.current.width, canvasRef.current.height, 'F');
@@ -239,42 +238,6 @@ export const Whiteboard: React.FC = () => {
         pdf.addImage(imgData, 'PNG', 0, 0, canvasRef.current.width, canvasRef.current.height);
         pdf.save(`quadro-v5-${theme}-${Date.now()}.pdf`);
     };
-
-    const onMenuMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-        isDraggingMenu.current = true;
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        dragOffset.current = {
-            x: clientX - menuPos.x,
-            y: clientY - menuPos.y
-        };
-    };
-
-    useEffect(() => {
-        const onMouseMove = (e: MouseEvent | TouchEvent) => {
-            if (!isDraggingMenu.current) return;
-            const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-            const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-
-            const padding = 10;
-            const x = Math.max(padding, Math.min(window.innerWidth - 300, clientX - dragOffset.current.x));
-            const y = Math.max(padding, Math.min(window.innerHeight - 80, clientY - dragOffset.current.y));
-
-            setMenuPos({ x, y });
-        };
-        const onMouseUp = () => { isDraggingMenu.current = false; };
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
-        window.addEventListener('touchmove', onMouseMove, { passive: false });
-        window.addEventListener('touchend', onMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-            window.removeEventListener('touchmove', onMouseMove);
-            window.removeEventListener('touchend', onMouseUp);
-        };
-    }, [menuPos]);
 
     const toggleFullscreen = () => {
         if (!containerRef.current) return;
@@ -302,55 +265,61 @@ export const Whiteboard: React.FC = () => {
                 className="absolute inset-0 w-full h-full cursor-crosshair touch-none z-10"
             />
 
-            {/* ULTRA-SLIM HORIZONTAL BAR */}
+            {/* FIXED BOTTOM HORIZONTAL BAR */}
             <div
-                style={{ left: menuPos.x, top: menuPos.y }}
-                className="absolute z-50 flex items-center gap-2 md:gap-4 bg-[#0F0A09]/95 backdrop-blur-2xl p-2 md:p-3 rounded-full border border-white/10 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] select-none transition-transform active:scale-[0.99]"
+                className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 animate-slide-up"
             >
-                <div
-                    onMouseDown={onMenuMouseDown}
-                    onTouchStart={onMenuMouseDown}
-                    className="p-1 px-2 cursor-grab active:cursor-grabbing text-stone-700 hover:text-white transition-colors"
-                >
-                    <GripHorizontal className="w-4 h-4 md:w-5 md:h-5" />
-                </div>
-
-                <div className="flex bg-white/5 p-1 rounded-full gap-1 border border-white/5">
-                    <button onClick={() => setTool('pencil')} className={`p-2 md:p-3 rounded-full transition-all hover:scale-110 ${tool === 'pencil' ? 'bg-[#E87A2C] text-white shadow-lg' : 'text-stone-500 hover:text-stone-300'}`}><Pencil className="w-4 h-4 md:w-5 md:h-5" /></button>
-                    <button onClick={() => setTool('eraser')} className={`p-2 md:p-3 rounded-full transition-all hover:scale-110 ${tool === 'eraser' ? 'bg-[#E87A2C] text-white shadow-lg' : 'text-stone-500 hover:text-stone-300'}`}><Eraser className="w-4 h-4 md:w-5 md:h-5" /></button>
-                </div>
-
-                <div className="flex gap-1.5 md:gap-3 px-1 md:px-2">
-                    {[(theme === 'blackboard' ? '#FFFFFF' : '#1A110D'), '#E87A2C', '#EF4444', '#3B82F6', '#10B981', '#F59E0B'].map(c => (
-                        <button
-                            key={c}
-                            onClick={() => { setColor(c); setTool('pencil'); }}
-                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 transition-all hover:scale-125 ${color === c && tool === 'pencil' ? 'border-white ring-2 ring-white/20' : 'border-transparent opacity-40 hover:opacity-100'}`}
-                            style={{ backgroundColor: c }}
-                        />
-                    ))}
-                </div>
-
-                <div className="flex items-center gap-2 md:gap-4 px-2 md:px-4 bg-white/5 rounded-full border border-white/5">
+                {/* Expandable Brush Size Control (Visible on Long Press) */}
+                <div className={`flex items-center gap-4 px-6 py-3 bg-[#0F0A09]/95 backdrop-blur-2xl rounded-full border border-white/10 shadow-2xl transition-all duration-300 origin-bottom ${showBrushSize ? 'scale-100 opacity-100 mb-0' : 'scale-0 opacity-0 -mb-12 pointer-events-none'}`}>
                     <button onClick={() => setBrushSize(prev => Math.max(2, prev - 2))} className="text-stone-500 hover:text-white transition-colors"><Minus className="w-4 h-4" /></button>
-                    <span className="text-[10px] md:text-xs font-black text-white w-4 text-center tabular-nums">{brushSize}</span>
+                    <div className="flex flex-col items-center min-w-[60px]">
+                        <span className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest">Tamanho</span>
+                        <span className="text-xs font-black text-white tabular-nums">{brushSize}px</span>
+                    </div>
                     <button onClick={() => setBrushSize(prev => Math.min(60, prev + 2))} className="text-stone-500 hover:text-white transition-colors"><Plus className="w-4 h-4" /></button>
                 </div>
 
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setTheme(theme === 'whiteboard' ? 'blackboard' : 'whiteboard')}
-                        className={`p-2 md:p-3 rounded-full bg-white/5 transition-all hover:scale-110 ${theme === 'blackboard' ? 'text-yellow-400 hover:text-yellow-300' : 'text-stone-500 hover:text-stone-300'}`}
-                        title={theme === 'whiteboard' ? 'Alternar para Blackboard' : 'Alternar para Whiteboard'}
-                    >
-                        {theme === 'whiteboard' ? <Moon className="w-4 h-4 md:w-5 md:h-5" /> : <Sun className="w-4 h-4 md:w-5 md:h-5" />}
-                    </button>
-                    <button onClick={undo} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white hover:bg-white/10 transition-all"><Undo className="w-4 h-4 md:w-5 md:h-5" /></button>
-                    <button onClick={clearCanvas} className="p-2 md:p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4 md:w-5 md:h-5" /></button>
-                    <button onClick={toggleFullscreen} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white transition-all">
-                        <Monitor className="w-4 h-4 md:w-5 md:h-5" />
-                    </button>
-                    <button onClick={exportToPDF} className="p-2 md:p-3 bg-[#E87A2C] text-white rounded-full shadow-xl hover:scale-105 transition-transform"><Download className="w-4 h-4 md:w-5 md:h-5" /></button>
+                <div className="flex items-center gap-2 md:gap-4 bg-[#0F0A09]/95 backdrop-blur-2xl p-2 md:p-3 rounded-full border border-white/10 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)] select-none">
+                    <div className="flex bg-white/5 p-1 rounded-full gap-1 border border-white/5">
+                        <button
+                            onMouseDown={() => { setTool('pencil'); handlePenHoldStart(); }}
+                            onMouseUp={handlePenHoldEnd}
+                            onMouseLeave={handlePenHoldEnd}
+                            onTouchStart={() => { setTool('pencil'); handlePenHoldStart(); }}
+                            onTouchEnd={handlePenHoldEnd}
+                            className={`p-2 md:p-3 rounded-full transition-all hover:scale-110 active:scale-95 ${tool === 'pencil' ? 'bg-[#E87A2C] text-white shadow-lg' : 'text-stone-500 hover:text-stone-300'}`}
+                            title="Caneta (Segure para tamanho)"
+                        >
+                            <Pencil className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
+                        <button onClick={() => setTool('eraser')} className={`p-2 md:p-3 rounded-full transition-all hover:scale-110 ${tool === 'eraser' ? 'bg-[#E87A2C] text-white shadow-lg' : 'text-stone-500 hover:text-stone-300'}`}><Eraser className="w-4 h-4 md:w-5 md:h-5" /></button>
+                    </div>
+
+                    <div className="flex gap-1.5 md:gap-3 px-1 md:px-2">
+                        {[(theme === 'blackboard' ? '#FFFFFF' : '#1A110D'), '#E87A2C', '#EF4444', '#3B82F6', '#10B981', '#F59E0B'].map(c => (
+                            <button
+                                key={c}
+                                onClick={() => { setColor(c); setTool('pencil'); }}
+                                className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 transition-all hover:scale-125 ${color === c && tool === 'pencil' ? 'border-white ring-2 ring-white/20' : 'border-transparent opacity-40 hover:opacity-100'}`}
+                                style={{ backgroundColor: c }}
+                            />
+                        ))}
+                    </div>
+
+                    <div className="flex gap-2 border-l border-white/10 pl-2 md:pl-4">
+                        <button
+                            onClick={() => setTheme(theme === 'whiteboard' ? 'blackboard' : 'whiteboard')}
+                            className={`p-2 md:p-3 rounded-full bg-white/5 transition-all hover:scale-110 ${theme === 'blackboard' ? 'text-yellow-400 hover:text-yellow-300' : 'text-stone-500 hover:text-stone-300'}`}
+                        >
+                            {theme === 'whiteboard' ? <Moon className="w-4 h-4 md:w-5 md:h-5" /> : <Sun className="w-4 h-4 md:w-5 md:h-5" />}
+                        </button>
+                        <button onClick={undo} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white transition-all"><Undo className="w-4 h-4 md:w-5 md:h-5" /></button>
+                        <button onClick={clearCanvas} className="p-2 md:p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><Trash2 className="w-4 h-4 md:w-5 md:h-5" /></button>
+                        <button onClick={toggleFullscreen} className="p-2 md:p-3 bg-white/5 text-stone-500 rounded-full hover:text-white transition-all">
+                            <Monitor className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
+                        <button onClick={exportToPDF} className="p-2 md:p-3 bg-[#E87A2C] text-white rounded-full shadow-xl hover:scale-105 transition-transform"><Download className="w-4 h-4 md:w-5 md:h-5" /></button>
+                    </div>
                 </div>
             </div>
 
@@ -360,7 +329,7 @@ export const Whiteboard: React.FC = () => {
             />
 
             {/* Theme Badge */}
-            <div className={`absolute bottom-8 right-12 px-4 py-2 rounded-full border backdrop-blur-md select-none transition-all duration-700 z-10 ${theme === 'blackboard' ? 'bg-white/5 border-white/10 text-stone-600' : 'bg-black/5 border-black/5 text-stone-400'}`}>
+            <div className={`absolute top-8 right-12 px-4 py-2 rounded-full border backdrop-blur-md select-none transition-all duration-700 z-10 ${theme === 'blackboard' ? 'bg-white/5 border-white/10 text-stone-600' : 'bg-black/5 border-black/5 text-stone-400'}`}>
                 <span className="text-[10px] font-black uppercase tracking-[0.4em]">MusiClass {theme.charAt(0).toUpperCase() + theme.slice(1)} Mode</span>
             </div>
         </div>
