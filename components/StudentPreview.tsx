@@ -309,11 +309,11 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             </div>
 
                             {/* Tablaturas (Ocultar para Bateria) */}
-                            {instrument !== Instrument.DRUMS && tabs.filter(t => t.content.length > 5).map((tab, i) => (
+                            {instrument !== Instrument.DRUMS && tabs?.map((tab, i) => (
                                 <section key={i} className="pt-8 border-t border-stone-100">
-                                    <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">{tab.title || "Material Complementar"}</h2>
-                                    <div className="bg-[#FBF6F0] p-6 rounded-2xl border border-stone-200 overflow-hidden">
-                                        <pre className="font-mono text-[#3C2415] text-[10px] sm:text-xs leading-relaxed tracking-wider whitespace-pre overflow-x-auto selection:bg-orange-100">
+                                    <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">{tab.title || "Material Complementar / TAB"}</h2>
+                                    <div className="bg-[#FBF6F0] p-6 rounded-2xl border border-stone-200 overflow-visible">
+                                        <pre className="font-mono text-[#3C2415] text-[10px] sm:text-xs leading-relaxed tracking-wider whitespace-pre selection:bg-orange-100">
                                             {tab.content}
                                         </pre>
                                     </div>

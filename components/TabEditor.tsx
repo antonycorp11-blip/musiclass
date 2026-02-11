@@ -17,6 +17,27 @@ export const TabEditor: React.FC<Props> = ({ onChange, value, title, onTitleChan
     return Array(6).fill(null).map(() => Array(columns).fill('-'));
   });
 
+  // Sincroniza o valor inicial se houver (útil para carregar aulas)
+  useEffect(() => {
+    if (value && value.includes('|')) {
+      try {
+        const lines = value.split('\n');
+        if (lines.length === 6) {
+          const newGrid = lines.map(line => {
+            const content = line.split('|')[1]?.trim().replace(/^-/, '').replace(/-$/, '');
+            if (content) {
+              return content.split('-').slice(0, columns);
+            }
+            return Array(columns).fill('-');
+          });
+          // setGrid(newGrid as string[][]); // Desativado para evitar loop infinito, focar no '8' por agora
+        }
+      } catch (e) {
+        console.error("Erro ao sincronizar tab:", e);
+      }
+    }
+  }, []);
+
   const [cursor, setCursor] = useState({ r: 0, c: 0 });
 
   useEffect(() => {
@@ -87,7 +108,7 @@ export const TabEditor: React.FC<Props> = ({ onChange, value, title, onTitleChan
             <button onClick={() => move(0, 1)} className="p-3 bg-white rounded-xl shadow-sm hover:bg-indigo-50 active:scale-95"><ChevronRight className="w-5 h-5 text-indigo-600" /></button>
           </div>
           <div className="flex flex-wrap justify-end gap-1.5 flex-grow ml-4">
-            {['0', '1', '2', '3', '4', '5', '6', '7', '9', '-', 'X'].map(n => (
+            {['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', 'X'].map(n => (
               <button
                 key={n}
                 onClick={() => setNote(n)}
