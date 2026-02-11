@@ -52,37 +52,36 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
     }, []);
 
     const handleDownloadPDF = async () => {
-        if (!documentRef.current) return;
+        setIsExporting(true);
         try {
             console.log('Iniciando exportação de PDF...');
-            if ((window as any).logDebug) (window as any).logDebug('Exportando PDF...');
-            setIsExporting(true);
+            if ((window as any).logDebug) (window as any).logDebug('Aguardando sincronização...');
 
-            // 1. Sync data and upload audios BEFORE generating PDF
-            if (onExport) {
-                await onExport();
-            }
+            // 1. Sincronização e Delay para estabilização do DOM
+            if (onExport) await onExport();
+            await new Promise(r => setTimeout(r, 1000)); // Delay maior para tablets
 
-            // Await for scale transform to be removed and React to update the DOM
-            await new Promise(r => setTimeout(r, 500));
+            // Busca o elemento de forma robusta
+            const element = document.getElementById('lesson-document') || documentRef.current;
 
-            const element = documentRef.current || document.getElementById('lesson-document');
             if (!element) {
-                throw new Error("Elemento do documento não encontrado no DOM");
+                alert("Erro Fatal: O documento da aula não foi encontrado para exportação.");
+                setIsExporting(false);
+                return;
             }
 
             console.log('Capturando canvas para PDF...');
             const canvas = await html2canvas(element as HTMLElement, {
-                scale: 2, // Safe scale for mobile memory
+                scale: 1.5, // Resolução segura para tablets (evita travamentos)
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                logging: true,
-                windowWidth: 1200, // Important for desktop layout capture
+                logging: false,
+                windowWidth: 1200,
             });
 
-            console.log('Iniciando jsPDF...');
-            const imgData = canvas.toDataURL('image/jpeg', 0.95); // Using JPEG for smaller PDF size
+            console.log('Gerando arquivo PDF...');
+            const imgData = canvas.toDataURL('image/jpeg', 0.90);
             const imgWidth = 210;
             let imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -95,20 +94,19 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
             pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
-            // Mapeamento de Links
-            const cards = documentRef.current.querySelectorAll('.audio-card-pdf');
+            // Mapeamento Blindado de Links
+            const cards = element.querySelectorAll('.audio-card-pdf');
             cards.forEach((card) => {
                 const cardElement = card as HTMLElement;
                 const url = cardElement.dataset.url;
                 if (!url) return;
 
                 const rect = cardElement.getBoundingClientRect();
-                const parentRect = documentRef.current!.getBoundingClientRect();
+                const parentRect = element.getBoundingClientRect();
 
                 const relTop = rect.top - parentRect.top;
                 const relLeft = rect.left - parentRect.left;
 
-                // Precision mapping for PDF links
                 const pdfX = (relLeft * 210) / parentRect.width;
                 const pdfY = (relTop * imgHeight) / parentRect.height;
                 const pdfW = (rect.width * 210) / parentRect.width;
@@ -117,13 +115,14 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
             });
 
-            console.log('Salvando PDF...');
-            pdf.save(`${studentName} - ${instrument} - ${today} - ${teacherName}.pdf`);
-            setIsExporting(false);
-            if ((window as any).logDebug) (window as any).logDebug('PDF baixado com sucesso.');
+            console.log('Salvando...');
+            pdf.save(`${studentName} - ${instrument} - ${today}.pdf`);
+
+            if ((window as any).logDebug) (window as any).logDebug('PDF baixado!');
         } catch (error) {
             console.error('Erro ao baixar PDF:', error);
-            alert('Falha ao gerar PDF: ' + (error instanceof Error ? error.message : String(error)));
+            alert('Erro na Geracao do PDF: ' + (error instanceof Error ? error.message : "Falha desconhecida"));
+        } finally {
             setIsExporting(false);
         }
     };
