@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Lock, Unlock, Activity } from 'lucide-react';
+import { Mic, MicOff, Lock, Unlock, Activity, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { PitchDetector } from 'pitchy';
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -10,7 +10,11 @@ export const Tuner: React.FC = () => {
     const [note, setNote] = useState<string>('');
     const [clarity, setClarity] = useState(0);
     const [lockedNote, setLockedNote] = useState<string | null>(null);
-    const [sensitivity, setSensitivity] = useState(0.85); // Default high sensitivity for vocals
+    const [targetFrequency, setTargetFrequency] = useState<number | null>(null);
+
+    // Smooth output using exponential smoothing
+    const smoothedPitch = useRef<number | null>(null);
+    const alpha = 0.2; // Smoothing factor (lower = smoother)
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
@@ -43,6 +47,7 @@ export const Tuner: React.FC = () => {
         if (audioContextRef.current) audioContextRef.current.close();
         setPitch(null);
         setNote('');
+        smoothedPitch.current = null;
     };
 
     const detectPitch = () => {
@@ -56,104 +61,140 @@ export const Tuner: React.FC = () => {
 
         setClarity(detectedClarity);
 
-        if (detectedClarity > sensitivity) {
-            const roundedPitch = Math.round(detectedPitch * 10) / 10;
-            setPitch(roundedPitch);
-
-            // Calculate Note
-            const midi = 12 * (Math.log2(detectedPitch / 440)) + 69;
-            const noteIndex = Math.round(midi) % 12;
-            const currentNote = NOTES[noteIndex];
-
-            if (lockedNote) {
-                if (currentNote === lockedNote) {
-                    setNote(currentNote);
-                }
+        // Lowered sensitivity threshold for better capture but smoothed output
+        if (detectedClarity > 0.8) {
+            // Apply smoothing
+            if (smoothedPitch.current === null) {
+                smoothedPitch.current = detectedPitch;
             } else {
-                setNote(currentNote);
+                smoothedPitch.current = smoothedPitch.current * (1 - alpha) + detectedPitch * alpha;
             }
+
+            const currentPitch = smoothedPitch.current;
+            setPitch(Math.round(currentPitch * 10) / 10);
+
+            const midi = 12 * (Math.log2(currentPitch / 440)) + 69;
+            const noteIndex = Math.round(midi) % 12;
+            setNote(NOTES[noteIndex]);
         }
 
         animationFrameRef.current = requestAnimationFrame(detectPitch);
     };
 
-    // UI Helper for "Cent" deviation (simplified)
-    const getDeviation = () => {
-        if (!pitch) return 0;
+    const handleLock = () => {
+        if (lockedNote) {
+            setLockedNote(null);
+            setTargetFrequency(null);
+        } else if (note && pitch) {
+            setLockedNote(note);
+            setTargetFrequency(pitch);
+        }
+    };
+
+    const getFeedback = () => {
+        if (!targetFrequency || !pitch) return null;
+        const diff = pitch - targetFrequency;
+        if (Math.abs(diff) < 2) return { text: 'PERFEITO', color: 'text-green-500', icon: Check };
+        if (diff > 0) return { text: 'BAIXE ↓', color: 'text-blue-500', icon: ChevronDown };
+        return { text: 'SUBA ↑', color: 'text-red-500', icon: ChevronUp };
+    };
+
+    const feedback = getFeedback();
+
+    const getDeviationPx = () => {
+        if (!pitch) return 50;
         const midi = 12 * (Math.log2(pitch / 440)) + 69;
-        return (midi - Math.round(midi)) * 100;
+        const dev = (midi - Math.round(midi)) * 100; // -50 to +50
+        return 50 + (dev);
     };
 
     return (
-        <div className="bg-stone-50 p-8 rounded-[32px] border border-stone-100 space-y-8 h-full">
+        <div className="bg-[#0F0A09] p-10 rounded-[48px] border border-white/5 shadow-2xl space-y-8 h-full flex flex-col">
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Activity className={`w-4 h-4 ${isListening ? 'text-[#E87A2C] animate-pulse' : 'text-stone-300'}`} />
-                    <h3 className="font-black uppercase text-xs tracking-widest text-stone-400">Afinador de Alta Precisão</h3>
+                <div className="flex items-center gap-3">
+                    <Activity className={`w-5 h-5 ${isListening ? 'text-[#E87A2C] animate-pulse' : 'text-stone-700'}`} />
+                    <div>
+                        <h3 className="font-black uppercase text-[10px] tracking-[0.3em] text-white">Audio Analysis</h3>
+                        <p className="text-[8px] font-bold text-[#E87A2C] uppercase tracking-widest italic">Vocal & Instrument Precision</p>
+                    </div>
                 </div>
+
                 <button
-                    onClick={() => setLockedNote(lockedNote ? null : note)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${lockedNote ? 'bg-red-500 text-white' : 'bg-stone-200 text-stone-500 hover:bg-stone-300'}`}
+                    onClick={handleLock}
+                    disabled={!isListening || (!note && !lockedNote)}
+                    className={`
+                        flex items-center gap-2 px-6 py-2.5 rounded-full text-[10px] font-black uppercase transition-all
+                        ${lockedNote ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'bg-white/5 text-stone-500 hover:bg-white/10 disabled:opacity-20'}
+                    `}
                 >
                     {lockedNote ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                    {lockedNote ? `TRAVADO EM ${lockedNote}` : 'TRAVAR NOTA'}
+                    {lockedNote ? `ALVO: ${lockedNote}` : 'TRAVAR NOTA'}
                 </button>
             </div>
 
-            <div className="flex flex-col items-center justify-center py-10 relative">
-                {/* Visual Meter */}
-                <div className="absolute top-0 w-full flex justify-between px-10 text-[8px] font-bold text-stone-300 uppercase tracking-widest">
-                    <span>-50</span>
-                    <span>FLAT</span>
-                    <span className="text-[#E87A2C]">PERFEITO</span>
-                    <span>SHARP</span>
-                    <span>+50</span>
+            <div className="flex-grow flex flex-col items-center justify-center py-10">
+                {/* Advanced Gauge */}
+                <div className="w-full max-w-md relative pb-10">
+                    <div className="absolute top-0 w-full flex justify-between px-2 text-[8px] font-black text-stone-600 uppercase tracking-widest">
+                        <span>Flat (-50)</span>
+                        <span className="text-white">In-Tune</span>
+                        <span>Sharp (+50)</span>
+                    </div>
+
+                    <div className="w-full h-8 bg-white/5 rounded-2xl mt-6 border border-white/5 overflow-hidden relative">
+                        {/* Perfect Zone */}
+                        <div className="absolute left-1/2 -translate-x-1/2 w-4 h-full bg-green-500/20" />
+
+                        {/* Needle */}
+                        <div
+                            className={`
+                                absolute top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full transition-all duration-75 shadow-2xl
+                                ${feedback?.text === 'PERFEITO' ? 'bg-green-500 shadow-green-500/50' : 'bg-[#E87A2C] shadow-[#E87A2C]/50'}
+                            `}
+                            style={{ left: `${getDeviationPx()}%`, transform: 'translate(-50%, -50%)' }}
+                        />
+                    </div>
                 </div>
 
-                <div className="w-full h-1.5 bg-stone-200 rounded-full mt-4 overflow-hidden relative">
-                    <div
-                        className={`absolute h-full transition-all duration-100 ${Math.abs(getDeviation()) < 5 ? 'bg-green-500 w-1' : 'bg-[#E87A2C] w-1'}`}
-                        style={{ left: `${50 + (getDeviation())}%`, transform: 'translateX(-50%)' }}
-                    />
-                    <div className="absolute left-1/2 -top-1 w-px h-3 bg-[#E87A2C]/20" />
-                </div>
+                <div className="text-center relative">
+                    {feedback && (
+                        <div className={`absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 px-6 py-2 rounded-full bg-white/5 border border-white/10 ${feedback.color} animate-bounce block`}>
+                            <feedback.icon className="w-4 h-4" />
+                            <span className="font-black text-xs uppercase tracking-widest">{feedback.text}</span>
+                        </div>
+                    )}
 
-                <div className="text-center mt-8 space-y-2">
-                    <div className="text-9xl font-black text-[#1A110D] tracking-tighter min-h-[140px]">
+                    <div className="text-[160px] font-black text-white leading-none tracking-tighter select-none">
                         {note || '--'}
                     </div>
-                    <div className="text-xl font-black text-[#E87A2C] tracking-tight">
-                        {pitch ? `${pitch} Hz` : 'Aguardando silêncio...'}
+
+                    <div className="flex flex-col gap-1 mt-4">
+                        <span className="text-2xl font-black text-[#E87A2C] tracking-tight tabular-nums">
+                            {pitch ? `${pitch.toFixed(1)} Hz` : 'Silêncio...'}
+                        </span>
+                        {targetFrequency && (
+                            <span className="text-[10px] font-bold text-stone-600 uppercase tracking-widest">
+                                Alvo: {targetFrequency.toFixed(1)} Hz
+                            </span>
+                        )}
                     </div>
                 </div>
-
-                {isListening && clarity < sensitivity && (
-                    <div className="mt-4 text-[9px] font-bold text-red-500 uppercase animate-pulse">
-                        Aumente o volume ou limpe o som
-                    </div>
-                )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-stone-200">
-                    <span className="text-[9px] font-black text-stone-400 uppercase block mb-2">Sensibilidade Vocal</span>
-                    <input
-                        type="range" min="0.5" max="0.99" step="0.01"
-                        value={sensitivity}
-                        onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-[#E87A2C]"
-                    />
-                </div>
-                <button
-                    onClick={isListening ? stopRecording : startRecording}
-                    className={`py-5 rounded-2xl flex items-center justify-center gap-3 transition-all ${isListening ? 'bg-stone-800 text-white' : 'bg-[#E87A2C] text-white shadow-lg shadow-orange-500/20 shadow-xl'}`}
-                >
-                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    <span className="font-black uppercase tracking-widest text-xs">
-                        {isListening ? 'DESLIGAR AFINADOR' : 'ATIVAR MICROFONE'}
-                    </span>
-                </button>
-            </div>
+            <button
+                onClick={isListening ? stopRecording : startRecording}
+                className={`
+                    w-full py-8 rounded-[32px] flex items-center justify-center gap-4 transition-all active:scale-[0.98]
+                    ${isListening
+                        ? 'bg-white text-black'
+                        : 'bg-[#E87A2C] text-white shadow-[0_20px_40px_rgba(232,122,44,0.2)] shadow-xl'}
+                `}
+            >
+                {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                <span className="font-black uppercase tracking-[0.2em] text-sm">
+                    {isListening ? 'DESATIVAR ESCUTA' : 'INICIAR AFINAÇÃO'}
+                </span>
+            </button>
         </div>
     );
 };

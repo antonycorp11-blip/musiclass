@@ -74,7 +74,7 @@ export const Toolbox: React.FC = () => {
                 )}
 
                 {activeTool === 'whiteboard' && (
-                    <div className="animate-fade-in h-[600px] bg-white p-8 rounded-[40px] border border-stone-100 shadow-sm">
+                    <div className="animate-fade-in h-[700px]">
                         <Whiteboard />
                     </div>
                 )}

@@ -1,38 +1,76 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pencil, Square, Type, Eraser, Trash2, Download, Undo } from 'lucide-react';
+import { Pencil, Eraser, Trash2, Download, Undo, Minus, Plus } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 export const Whiteboard: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#1A110D');
-    const [brushSize, setBrushSize] = useState(3);
+    const [brushSize, setBrushSize] = useState(4);
     const [tool, setTool] = useState<'pencil' | 'eraser'>('pencil');
     const [history, setHistory] = useState<string[]>([]);
 
     useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        const resizeCanvas = () => {
+            const canvas = canvasRef.current;
+            const container = containerRef.current;
+            if (!canvas || !container) return;
 
-        // Setup canvas size
-        const parent = canvas.parentElement;
-        if (parent) {
-            canvas.width = parent.clientWidth;
-            canvas.height = parent.clientHeight;
-        }
+            // Store current content
+            const temp = canvas.toDataURL();
 
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
 
-        // Save initial state
-        setHistory([canvas.toDataURL()]);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                // Restore content
+                const img = new Image();
+                img.src = temp;
+                img.onload = () => ctx.drawImage(img, 0, 0);
+            }
+        };
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initial history
+        if (canvasRef.current) setHistory([canvasRef.current.toDataURL()]);
+
+        return () => window.removeEventListener('resize', resizeCanvas);
     }, []);
 
+    const getPos = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+
+        let clientX, clientY;
+        if ('touches' in e) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = (e as MouseEvent).clientX;
+            clientY = (e as MouseEvent).clientY;
+        }
+
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    };
+
     const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+        const ctx = canvasRef.current?.getContext('2d');
+        if (!ctx) return;
+
         setIsDrawing(true);
-        draw(e);
+        const { x, y } = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
     };
 
     const stopDrawing = () => {
@@ -40,8 +78,6 @@ export const Whiteboard: React.FC = () => {
             saveToHistory();
         }
         setIsDrawing(false);
-        const ctx = canvasRef.current?.getContext('2d');
-        ctx?.beginPath();
     };
 
     const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -49,30 +85,22 @@ export const Whiteboard: React.FC = () => {
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
 
-        const rect = canvasRef.current.getBoundingClientRect();
-        let clientX, clientY;
+        // Prevent scrolling on touch
+        if (e.cancelable) e.preventDefault();
 
-        if ('touches' in e) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
+        const { x, y } = getPos(e);
 
         ctx.lineWidth = brushSize;
         ctx.strokeStyle = tool === 'eraser' ? '#FFFFFF' : color;
 
-        ctx.lineTo(clientX - rect.left, clientY - rect.top);
+        ctx.lineTo(x, y);
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(clientX - rect.left, clientY - rect.top);
     };
 
     const saveToHistory = () => {
         if (canvasRef.current) {
-            const newHistory = [...history, canvasRef.current.toDataURL()].slice(-20);
-            setHistory(newHistory);
+            const dataUrl = canvasRef.current.toDataURL();
+            setHistory(prev => [...prev, dataUrl].slice(-20));
         }
     };
 
@@ -88,7 +116,7 @@ export const Whiteboard: React.FC = () => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0);
             };
-            setHistory(history.slice(0, -1));
+            setHistory(prevH => prevH.slice(0, -1));
         }
     };
 
@@ -110,73 +138,94 @@ export const Whiteboard: React.FC = () => {
             format: [canvasRef.current.width, canvasRef.current.height]
         });
         pdf.addImage(imgData, 'PNG', 0, 0, canvasRef.current.width, canvasRef.current.height);
-        pdf.save(`aula-notas-${new Date().getTime()}.pdf`);
+        pdf.save(`quadro-aula-${new Date().getTime()}.pdf`);
     };
 
     return (
-        <div className="flex flex-col h-full space-y-4">
-            <div className="flex items-center justify-between pb-4 border-b border-stone-100">
-                <div className="flex gap-2">
+        <div ref={containerRef} className="relative w-full h-full bg-white rounded-[40px] shadow-2xl overflow-hidden border border-stone-100 group">
+            {/* Canvas Area */}
+            <canvas
+                ref={canvasRef}
+                onMouseDown={startDrawing}
+                onMouseUp={stopDrawing}
+                onMouseMove={draw}
+                onMouseOut={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchEnd={stopDrawing}
+                onTouchMove={draw}
+                className="absolute inset-0 w-full h-full touch-none"
+            />
+
+            {/* Floating Top Controls */}
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-[#1A110D]/90 backdrop-blur-md p-3 rounded-[28px] border border-white/5 shadow-2xl opacity-40 hover:opacity-100 transition-opacity duration-300">
+                <div className="flex gap-2 bg-white/5 p-1 rounded-2xl">
                     <button
                         onClick={() => setTool('pencil')}
-                        className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-[#E87A2C] text-white shadow-lg shadow-orange-500/20' : 'bg-white text-stone-400 border border-stone-200 hover:bg-stone-50'}`}
+                        className={`p-3 rounded-xl transition-all ${tool === 'pencil' ? 'bg-[#E87A2C] text-white' : 'text-stone-400 hover:text-white'}`}
                     >
                         <Pencil className="w-5 h-5" />
                     </button>
                     <button
                         onClick={() => setTool('eraser')}
-                        className={`p-3 rounded-xl transition-all ${tool === 'eraser' ? 'bg-[#E87A2C] text-white shadow-lg shadow-orange-500/20' : 'bg-white text-stone-400 border border-stone-200 hover:bg-stone-50'}`}
+                        className={`p-3 rounded-xl transition-all ${tool === 'eraser' ? 'bg-[#E87A2C] text-white' : 'text-stone-400 hover:text-white'}`}
                     >
                         <Eraser className="w-5 h-5" />
                     </button>
-                    <div className="w-px h-10 bg-stone-100 mx-2" />
+                </div>
+
+                <div className="h-6 w-px bg-white/10" />
+
+                <div className="flex gap-2">
+                    {['#1A110D', '#E87A2C', '#EF4444', '#3B82F6'].map(c => (
+                        <button
+                            key={c}
+                            onClick={() => { setColor(c); setTool('pencil'); }}
+                            className={`w-8 h-8 rounded-full border-2 transition-transform ${color === c && tool === 'pencil' ? 'scale-110 border-white' : 'border-transparent opacity-50'}`}
+                            style={{ backgroundColor: c }}
+                        />
+                    ))}
+                </div>
+
+                <div className="h-6 w-px bg-white/10" />
+
+                <div className="flex items-center gap-4 text-white">
+                    <button onClick={() => setBrushSize(prev => Math.max(1, prev - 1))} className="p-1 hover:text-[#E87A2C]"><Minus className="w-4 h-4" /></button>
+                    <span className="text-[10px] font-black w-4 text-center">{brushSize}</span>
+                    <button onClick={() => setBrushSize(prev => Math.min(20, prev + 1))} className="p-1 hover:text-[#E87A2C]"><Plus className="w-4 h-4" /></button>
+                </div>
+            </div>
+
+            {/* Bottom Right Actions */}
+            <div className="absolute bottom-6 right-6 flex flex-col gap-3 items-end">
+                <div className="flex gap-2">
                     <button
                         onClick={undo}
-                        className="p-3 bg-white text-stone-400 border border-stone-200 rounded-xl hover:bg-stone-50"
+                        className="p-4 bg-white shadow-xl rounded-2xl text-stone-600 border border-stone-100 hover:bg-stone-50 transition-all hover:-translate-y-1"
                     >
                         <Undo className="w-5 h-5" />
                     </button>
                     <button
                         onClick={clearCanvas}
-                        className="p-3 bg-white text-stone-400 border border-stone-200 rounded-xl hover:text-red-500 hover:bg-red-50"
+                        className="p-4 bg-white shadow-xl rounded-2xl text-red-500 border border-stone-100 hover:bg-red-50 transition-all hover:-translate-y-1"
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="flex gap-2 bg-white p-1.5 rounded-xl border border-stone-200 shadow-sm">
-                        {['#1A110D', '#E87A2C', '#EF4444', '#3B82F6', '#10B981'].map(c => (
-                            <button
-                                key={c}
-                                onClick={() => { setColor(c); setTool('pencil'); }}
-                                className={`w-6 h-6 rounded-full transition-transform ${color === c && tool === 'pencil' ? 'scale-125 ring-2 ring-stone-200 ring-offset-2' : ''}`}
-                                style={{ backgroundColor: c }}
-                            />
-                        ))}
-                    </div>
-                    <button
-                        onClick={exportToPDF}
-                        className="flex items-center gap-2 px-5 py-3 bg-[#1A110D] text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-stone-800 transition-all shadow-lg"
-                    >
-                        <Download className="w-4 h-4" />
-                        Exportar PDF
-                    </button>
-                </div>
+                <button
+                    onClick={exportToPDF}
+                    className="flex items-center gap-3 px-8 py-5 bg-[#E87A2C] text-white rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 transition-all hover:-translate-y-1 active:scale-95"
+                >
+                    <Download className="w-5 h-5" />
+                    Salvar Quadro em PDF
+                </button>
             </div>
 
-            <div className="flex-grow bg-white rounded-3xl border border-stone-100 shadow-inner overflow-hidden relative cursor-crosshair">
-                <canvas
-                    ref={canvasRef}
-                    onMouseDown={startDrawing}
-                    onMouseUp={stopDrawing}
-                    onMouseMove={draw}
-                    onMouseOut={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchEnd={stopDrawing}
-                    onTouchMove={draw}
-                    className="absolute inset-0 w-full h-full touch-none"
-                />
+            {/* Legend */}
+            <div className="absolute bottom-6 left-6 pointer-events-none">
+                <span className="text-[8px] font-black text-stone-300 uppercase tracking-widest bg-stone-50/50 backdrop-blur-sm px-3 py-1.5 rounded-full border border-stone-100">
+                    MusiClass Vision Board v2
+                </span>
             </div>
         </div>
     );
