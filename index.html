@@ -46,45 +46,77 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #FBF6F0;
         }
     </style>
     <link rel="stylesheet" href="/index.css">
 </head>
 
-<body style="background-color: #1A110D; color: white; margin: 0; padding: 0;">
+<body class="bg-[#FBF6F0] text-[#1A110D]">
     <script>
-        // Forçar limpeza de service workers antigos que podem estar causando a tela branca
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
-                    registration.unregister();
+        // SCRIPT DE LIMPEZA PROFUNDA - Para resolver o problema da guia normal
+        async function clearAllSystemCache() {
+            try {
+                // 1. Limpa Cache Storage
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (const name of cacheNames) {
+                        await caches.delete(name);
+                    }
                 }
+                // 2. Desregistra Service Workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+                console.log('Cache do sistema limpo com sucesso.');
+            } catch (e) {
+                console.error('Erro ao limpar cache:', e);
+            }
+        }
+
+        // Executa a limpeza se for a primeira vez nesta versão
+        const RESET_VERSION = 'v5_hard_reset';
+        if (localStorage.getItem('system_reset_version') !== RESET_VERSION) {
+            clearAllSystemCache().then(() => {
+                localStorage.setItem('system_reset_version', RESET_VERSION);
+                // Não recarregamos automaticamente para evitar loop, 
+                // o navegador usará o novo script nas próximas requisições.
             });
         }
     </script>
+
     <div id="root">
         <div
-            style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1A110D; color: white; font-family: sans-serif; text-align: center; padding: 20px;">
-            <div style="padding: 40px; border: 2px solid #E87A2C; border-radius: 40px;">
-                <h1 style="color: #E87A2C; margin: 0; font-size: 32px; font-weight: 900;">MUSICLASS V4</h1>
-                <p id="boot-status" style="margin-top: 20px; font-weight: 700;">AGUARDANDO CONEXÃO...</p>
-                <div id="debug-log" style="margin-top: 40px; font-size: 10px; color: #888; text-align: left;">
+            style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #FBF6F0; padding: 20px; transition: opacity 0.5s ease-in-out;">
+            <div style="display: flex; flex-direction: column; items-center; text-align: center; gap: 20px;">
+                <img src="/Logo-Laranja.png" alt="Logo"
+                    style="height: 80px; width: auto; object-contain: contain; margin-bottom: 20px;" />
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <h1
+                        style="color: #1A110D; margin: 0; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; font-style: italic;">
+                        MusiClass</h1>
+                    <p
+                        style="text-transform: uppercase; font-weight: 700; letter-spacing: 4px; font-size: 8px; color: #E87A2C; opacity: 0.8;">
+                        Educational Ecosystem</p>
+                </div>
+                <div style="margin-top: 30px; display: flex; items-center; justify-content: center; gap: 8px;">
+                    <div
+                        style="width: 6px; height: 6px; background: #E87A2C; border-radius: 50%; animate: pulse 1.5s infinite;">
+                    </div>
+                    <p id="boot-status"
+                        style="font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; color: #1A110D; margin: 0;">
+                        Sincronizando Aula...</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        function logDebug(msg) {
-            var el = document.getElementById('debug-log');
-            if (el) el.innerHTML += msg + '\n';
-        }
-        logDebug('Boot iniciado ' + new Date().toLocaleTimeString());
-        logDebug('URL: ' + window.location.href);
-    </script>
     <script type="module" src="/index.tsx"></script>
     <script nomodule>
-        alert("SEU TABLET É ANTIGO DEMAIS:\nEste navegador não suporta 'JavaScript Modules'. Por favor, tente atualizar o tablet ou usar o Google Chrome mais recente.");
+        alert("Navegador Incompatível: Por favor, tente usar o Google Chrome mais recente.");
     </script>
 </body>
 
