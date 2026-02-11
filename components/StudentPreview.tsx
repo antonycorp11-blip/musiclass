@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { ChordVisualizer } from './ChordVisualizer';
 import { Logo } from './Logo';
 import { Instrument, Level, SoloNote } from '../types';
-import { User, X, Image as ImageIcon, GraduationCap, Calendar, Music, FileText, Play, Headphones } from 'lucide-react';
+import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones } from 'lucide-react';
 
 
 interface StudentPreviewProps {
@@ -34,42 +34,6 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
     const [isExporting, setIsExporting] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    const handleDownloadImage = async () => {
-        if (!documentRef.current) return;
-        try {
-            console.log('Iniciando exportação de imagem...');
-            if ((window as any).logDebug) (window as any).logDebug('Exportando PNG...');
-            setIsExporting(true);
-
-            const canvas = await html2canvas(documentRef.current, {
-                scale: 3, // High quality, lower memory usage than 5
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: true,
-                windowWidth: 1200,
-            });
-
-            console.log('Canvas gerado, criando link...');
-            const link = document.createElement('a');
-            link.download = `${studentName} - ${instrument} - ${today} - ${teacherName}.png`;
-            link.href = canvas.toDataURL('image/png', 1.0);
-
-            if (onExport) await onExport();
-
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            setIsExporting(false);
-            if ((window as any).logDebug) (window as any).logDebug('Imagem baixada com sucesso.');
-        } catch (error) {
-            console.error('Erro ao baixar imagem:', error);
-            alert('Falha ao gerar imagem: ' + (error instanceof Error ? error.message : String(error)));
-            setIsExporting(false);
-        }
-    };
-
     useEffect(() => {
         const updateScale = () => {
             if (wrapperRef.current) {
@@ -97,17 +61,24 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             // 1. Sync data and upload audios BEFORE generating PDF
             if (onExport) {
                 await onExport();
-                await new Promise(r => setTimeout(r, 800)); // Increased wait
+            }
+
+            // Await for scale transform to be removed and React to update the DOM
+            await new Promise(r => setTimeout(r, 500));
+
+            const element = documentRef.current || document.getElementById('lesson-document');
+            if (!element) {
+                throw new Error("Elemento do documento não encontrado no DOM");
             }
 
             console.log('Capturando canvas para PDF...');
-            const canvas = await html2canvas(documentRef.current, {
-                scale: 2.5, // Good balance for PDF memory on mobile
+            const canvas = await html2canvas(element as HTMLElement, {
+                scale: 2, // Safe scale for mobile memory
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
                 logging: true,
-                windowWidth: 1200,
+                windowWidth: 1200, // Important for desktop layout capture
             });
 
             console.log('Iniciando jsPDF...');
@@ -137,6 +108,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 const relTop = rect.top - parentRect.top;
                 const relLeft = rect.left - parentRect.left;
 
+                // Precision mapping for PDF links
                 const pdfX = (relLeft * 210) / parentRect.width;
                 const pdfY = (relTop * imgHeight) / parentRect.height;
                 const pdfW = (rect.width * 210) / parentRect.width;
@@ -166,15 +138,17 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 <div className="flex gap-2">
                     <button
                         onClick={handleDownloadPDF}
-                        className="bg-[#1A110D] hover:bg-stone-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10"
+                        disabled={isExporting}
+                        className={`${isExporting ? 'bg-stone-500 animate-pulse' : 'bg-[#E87A2C] hover:bg-orange-600'} px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10`}
                     >
-                        <FileText className="w-3.5 h-3.5 text-[#E87A2C]" /> Salvar PDF Interativo
-                    </button>
-                    <button
-                        onClick={handleDownloadImage}
-                        className="bg-[#E87A2C] hover:bg-orange-600 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white"
-                    >
-                        <ImageIcon className="w-3.5 h-3.5" /> Salvar Imagem (PNG)
+                        {isExporting ? (
+                            <>Sincronizando...</>
+                        ) : (
+                            <>
+                                <FileText className="w-3.5 h-3.5" />
+                                Gerar PDF da Aula
+                            </>
+                        )}
                     </button>
                     <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-all">
                         <X className="w-4 h-4" />
@@ -185,6 +159,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             <div ref={wrapperRef} className="w-full flex flex-col items-center">
                 <div
                     ref={documentRef}
+                    id="lesson-document"
                     className="bg-white"
                     style={{
                         width: '210mm',
