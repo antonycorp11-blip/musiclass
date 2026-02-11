@@ -913,15 +913,32 @@ const App: React.FC = () => {
         {
           activeTab === 'history' && (
             <div className="max-w-6xl mx-auto animate-fade-in space-y-12">
-              <header>
-                <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Histórico de Aulas</h2>
-                <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Acompanhamento pedagógico</p>
+              <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <h2 className="text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Histórico de Aulas</h2>
+                  <p className="text-sm font-bold text-[#E87A2C] uppercase tracking-[0.3em] mt-2 italic">Acompanhamento pedagógico</p>
+                </div>
+                {selectedStudent && (
+                  <div className="bg-[#E87A2C] px-6 py-3 rounded-2xl flex items-center gap-4 shadow-xl">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-white/60 uppercase tracking-widest">Filtrando Aluno</span>
+                      <p className="text-sm font-black text-white uppercase tracking-tight">{selectedStudent.name}</p>
+                    </div>
+                    <button onClick={() => setSelectedStudent(null)} className="w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center text-white transition-all">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </header>
 
               <div className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm overflow-hidden">
                 <div className="space-y-6">
                   {lessonHistory
-                    .filter(h => currentUser?.role === 'director' || h.teacher_id === currentUser?.id)
+                    .filter(h => {
+                      const isAuth = currentUser?.role === 'director' || h.teacher_id === currentUser?.id;
+                      const isForStudent = selectedStudent ? h.student_id === selectedStudent.id : true;
+                      return isAuth && isForStudent;
+                    })
                     .map((h, i) => (
                       <div key={i} className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-[#FBF6F0] rounded-3xl gap-4 group hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-orange-100">
                         <div className="flex items-center gap-6">

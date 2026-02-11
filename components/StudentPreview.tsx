@@ -39,7 +39,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         setIsExporting(true);
 
         const canvas = await html2canvas(documentRef.current, {
-            scale: 4,
+            scale: 5, // Ultra High Quality
             useCORS: true,
             backgroundColor: '#ffffff',
             logging: false,
@@ -47,7 +47,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         });
 
         const link = document.createElement('a');
-        link.download = `aula-${studentName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.png`;
+        link.download = `${studentName} - ${instrument} - ${today} - ${teacherName}.png`;
         link.href = canvas.toDataURL('image/png', 1.0);
 
         // Save to backend ONLY on export
@@ -86,15 +86,14 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         }
 
         const canvas = await html2canvas(documentRef.current, {
-            scale: 3, // High quality
+            scale: 5, // Ultra High Resolution
             useCORS: true,
             backgroundColor: '#ffffff',
             logging: false,
-            width: 794,
-            windowWidth: 794, // Ensure no responsive layout shifts during capture
+            windowWidth: 1200, // Simula uma janela maior para garantir que o layout "desktop" (que cabe no A4) seja o capturado
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgData = canvas.toDataURL('image/png');
         const imgWidth = 210;
         const pageHeight = 297;
 
@@ -109,7 +108,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             compress: true
         });
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
 
         // Mapeamento Blindado de Links (Precisão Cirúrgica)
         const cards = documentRef.current.querySelectorAll('.audio-card-pdf');
@@ -139,7 +138,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
         });
 
-        pdf.save(`aula-${studentName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`);
+        pdf.save(`${studentName} - ${instrument} - ${today} - ${teacherName}.pdf`);
         setIsExporting(false);
         if (onExport) onExport();
     };
@@ -152,21 +151,18 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                     <Logo light size="sm" />
                 </div>
                 <div className="flex gap-2">
-                    {(instrument === Instrument.VOCALS || instrument === Instrument.DRUMS || instrument === Instrument.KEYBOARD || instrument === Instrument.PIANO || instrument === Instrument.GUITAR || instrument === Instrument.ELECTRIC_GUITAR || instrument === Instrument.BASS) ? (
-                        <button
-                            onClick={handleDownloadPDF}
-                            className="bg-[#1A110D] hover:bg-stone-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10"
-                        >
-                            <FileText className="w-3.5 h-3.5 text-[#E87A2C]" /> Salvar Ficha Interativa (PDF)
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleDownloadImage}
-                            className="bg-[#E87A2C] hover:bg-orange-600 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white"
-                        >
-                            <ImageIcon className="w-3.5 h-3.5" /> Salvar Alta Resolução (PNG)
-                        </button>
-                    )}
+                    <button
+                        onClick={handleDownloadPDF}
+                        className="bg-[#1A110D] hover:bg-stone-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10"
+                    >
+                        <FileText className="w-3.5 h-3.5 text-[#E87A2C]" /> Salvar PDF Interativo
+                    </button>
+                    <button
+                        onClick={handleDownloadImage}
+                        className="bg-[#E87A2C] hover:bg-orange-600 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white"
+                    >
+                        <ImageIcon className="w-3.5 h-3.5" /> Salvar Imagem (PNG)
+                    </button>
                     <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-all">
                         <X className="w-4 h-4" />
                     </button>
@@ -176,7 +172,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             <div ref={wrapperRef} className="w-full flex flex-col items-center">
                 <div
                     ref={documentRef}
-                    className="bg-white shadow-none print:shadow-none"
+                    className="bg-white"
                     style={{
                         width: '210mm',
                         minHeight: '297mm',
@@ -190,31 +186,24 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 >
                     {/* Slim Header */}
                     <div className="bg-[#1A110D] border-b-[6px] border-[#E87A2C]">
-                        <div className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                            <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-3">
-                                    <Logo light size="md" />
+                        <div className="p-10 flex flex-row justify-between items-center gap-12">
+                            {/* Brand & Instrument */}
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <img src="/Logo Laranja.png" alt="Logo" className="h-10 w-auto object-contain brightness-110 self-start" />
+                                    <span className="text-[10px] font-black text-white uppercase tracking-tighter italic">MusiClass</span>
                                 </div>
-                                <h1 className="text-xl font-black text-white uppercase tracking-tighter mt-2">Prática de {instrument}</h1>
+                                <h1 className="text-xl font-black text-white uppercase tracking-tighter">Prática de {instrument}</h1>
                             </div>
 
-                            <div className="flex flex-wrap items-start gap-x-12 gap-y-4 pt-4 md:pt-0 border-t border-white/5 md:border-none w-full md:w-auto">
-                                <div className="flex gap-8 items-start">
-                                    <div className="flex flex-col border-l-2 border-[#E87A2C] pl-4">
-                                        <span className="text-[6px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-1">Aluno</span>
-                                        <span className="text-[11px] font-black text-white uppercase tracking-tight">{studentName}</span>
-                                        <div className="mt-2">
-                                            <span className="text-[6px] font-black text-[#E87A2C]/50 uppercase tracking-[0.3em] mb-0.5">Emissão</span>
-                                            <p className="text-[9px] font-bold text-stone-400 uppercase tracking-tight">{today}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-px h-12 bg-white/10 hidden md:block self-center" />
-
-                                    <div className="flex flex-col border-l-2 border-white/10 pl-4 md:border-none md:pl-0">
-                                        <span className="text-[6px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-1">Professor</span>
-                                        <span className="text-[11px] font-black text-white uppercase tracking-tight">{teacherName}</span>
-                                    </div>
+                            {/* Info Grid - Simplified */}
+                            <div className="flex gap-12">
+                                <div className="flex flex-col border-l-2 border-[#E87A2C] pl-5">
+                                    <span className="text-[13px] font-black text-white uppercase tracking-tight leading-tight">{studentName}</span>
+                                    <span className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest mt-1">{today}</span>
+                                </div>
+                                <div className="flex flex-col border-l-2 border-white/20 pl-5">
+                                    <span className="text-[11px] font-black text-white uppercase tracking-tight opacity-70">Prof. {teacherName}</span>
                                 </div>
                             </div>
                         </div>
@@ -245,7 +234,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                         </div>
                                         <span className="text-[11px] font-black text-stone-500 uppercase">{chords.length} ACORDES</span>
                                     </div>
-                                    <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'} gap-3 md:gap-4`}>
+                                    <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') ? 'grid-cols-4' : 'grid-cols-2'} gap-4`}>
                                         {chords.map((chord, i) => (
                                             <ChordVisualizer
                                                 key={i}
@@ -263,9 +252,9 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 </section>
                             )}
 
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                            <div className="grid grid-cols-12 gap-10">
                                 {/* Left Side: Solos */}
-                                <div className="lg:col-span-8 space-y-10">
+                                <div className="col-span-8 space-y-6">
                                     {solos.length > 0 && instrument !== Instrument.VOCALS && instrument !== Instrument.DRUMS && (
                                         <section>
                                             <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Solos e Melodias (Bimanual)</h2>
@@ -287,7 +276,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                         <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
                                                                             <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                                 {harmonyNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="px-2 py-0.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm">
+                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-none">
                                                                                         {n.note}
                                                                                     </div>
                                                                                 ))}
@@ -295,7 +284,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                             <div className="h-px bg-stone-200 w-full" />
                                                                             <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                                 {soloNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="px-2 py-0.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm">
+                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-none">
                                                                                         {n.note}
                                                                                     </div>
                                                                                 ))}
@@ -312,41 +301,18 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                     )}
                                 </div>
 
-                                {/* Right Side: Exercises & Scales */}
-                                <div className="lg:col-span-4 space-y-10">
+                                {/* Right Side: Exercises */}
+                                <div className="col-span-4 space-y-10">
                                     {exercises.length > 0 && (
                                         <section>
                                             <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Checklist de Prática</h2>
                                             <div className="space-y-2">
                                                 {exercises.map((ex, i) => (
                                                     <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
-                                                        <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C]">
+                                                        <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-none">
                                                             {i + 1}
                                                         </div>
                                                         <span className="text-[11px] font-black text-[#3C2415] leading-tight">{ex}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {scales.length > 0 && instrument !== Instrument.VOCALS && instrument !== Instrument.DRUMS && (
-                                        <section>
-                                            <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Fundamentos</h2>
-                                            <div className="space-y-3">
-                                                {scales.map((scale, i) => (
-                                                    <div key={i} className="bg-[#1A110D] p-5 rounded-xl shadow-xl">
-                                                        <div className="flex justify-between items-center mb-4">
-                                                            <p className="text-[9px] font-black text-[#E87A2C] uppercase tracking-widest">{scale.root} {scale.name}</p>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#E87A2C] animate-pulse" />
-                                                        </div>
-                                                        <div className="flex flex-nowrap gap-1.5 justify-start mt-2 overflow-hidden">
-                                                            {scale.notes.map((n: string, ni: number) => (
-                                                                <div key={ni} className="w-7 h-7 md:w-8 md:h-8 bg-white/10 border border-white/10 flex items-center justify-center font-black text-white text-[8px] md:text-[10px] rounded-[6px] shadow-lg shrink-0">
-                                                                    {n}
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -366,6 +332,30 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                     </div>
                                 </section>
                             ))}
+
+                            {/* Escalas e Fundamentos (Largura Total na Base) */}
+                            {scales.length > 0 && instrument !== Instrument.VOCALS && instrument !== Instrument.DRUMS && (
+                                <section className="pt-8 border-t-2 border-[#E87A2C]/10">
+                                    <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-6">Fundamentos e Escalas Práticas</h2>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {scales.map((scale, i) => (
+                                            <div key={i} className="bg-[#1A110D] p-6 rounded-[24px] shadow-xl flex items-center justify-between gap-10">
+                                                <div className="flex flex-col min-w-[120px]">
+                                                    <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest">{scale.root} {scale.name}</p>
+                                                    <span className="text-[7px] font-bold text-stone-500 uppercase tracking-[0.3em] mt-1">Nível Técnico I</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 justify-end flex-grow">
+                                                    {scale.notes.map((n: string, ni: number) => (
+                                                        <div key={ni} className="inline-flex items-center justify-center w-9 h-9 bg-white/10 border border-white/10 font-black text-white text-[11px] rounded-xl shadow-lg leading-none">
+                                                            {n}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* Seção de Bateria (Exclusivo Bateria) */}
                             {instrument === Instrument.DRUMS && (
@@ -436,13 +426,13 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                     {drums.rudiments.length > 0 && (
                                         <section>
                                             <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-6">Fundamentos de Mãos (Rudimentos)</h2>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-2 gap-4">
                                                 {drums.rudiments.map((rud, idx) => (
                                                     <div key={idx} className="bg-stone-50 p-5 rounded-2xl border border-stone-100">
                                                         <p className="text-[8px] font-black text-stone-400 uppercase tracking-widest mb-3">{rud.title}</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {rud.pattern.map((hand: string, sIdx: number) => (
-                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${hand === 'R' ? 'bg-[#E87A2C] text-white' : 'bg-[#1A110D] text-white'}`}>
+                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${hand === 'R' ? 'bg-[#E87A2C] text-white' : 'bg-[#1A110D] text-white'} leading-none`}>
                                                                     {hand}
                                                                 </div>
                                                             ))}
@@ -464,7 +454,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                         </div>
                                         <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest">Guias de Estudo e Referência</h2>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-2 gap-6">
                                         {recordings.map((rec) => (
                                             <div
                                                 key={rec.id}
@@ -476,12 +466,9 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                         <Play className="w-5 h-5 fill-current" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-[11px] font-black text-white uppercase tracking-tight">{rec.title || 'Referência MusiClass'}</p>
-                                                        <p className="text-[8px] font-bold text-stone-500 uppercase tracking-widest mt-0.5">Clique para ouvir no PDF</p>
+                                                        <p className="text-[11px] font-black text-white uppercase tracking-tight leading-none">{rec.title || 'Referência MusiClass'}</p>
+                                                        <p className="text-[8px] font-bold text-stone-500 uppercase tracking-widest mt-1.5">Clique para ouvir no PDF</p>
                                                     </div>
-                                                </div>
-                                                <div className="hidden md:block opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <audio src={rec.url} controls className="w-24 h-6 brightness-90 scale-75 origin-right" />
                                                 </div>
                                             </div>
                                         ))}
@@ -489,14 +476,14 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 </section>
                             )}
                         </div>
+                    </div>
 
-                        {/* Footer */}
-                        <div className="py-10 text-center bg-stone-50 border-t border-stone-100 flex flex-col items-center gap-4">
-                            <Logo size="sm" />
-                            <div className="flex flex-col gap-1">
-                                <p className="text-[8px] font-black text-stone-400 uppercase tracking-[0.6em]">MusiClass Educational Ecosystem</p>
-                                <p className="text-[6px] font-bold text-stone-300 uppercase tracking-widest">Certification of Musical Progress &bull; {new Date().getFullYear()}</p>
-                            </div>
+                    {/* Footer */}
+                    <div className="py-10 text-center bg-stone-50 border-t border-stone-100 flex flex-col items-center gap-4">
+                        <Logo size="sm" />
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-stone-400 uppercase tracking-[0.6em]">MusiClass Educational Ecosystem</p>
+                            <p className="text-[6px] font-bold text-stone-300 uppercase tracking-widest">Certification of Musical Progress &bull; {new Date().getFullYear()}</p>
                         </div>
                     </div>
                 </div>
