@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pencil, Eraser, Trash2, Download, Undo, Minus, Plus, Maximize, GripHorizontal, Moon, Sun, Monitor } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { Logo } from '../Logo';
 
 interface Point {
     x: number;
@@ -360,9 +361,9 @@ export const Whiteboard: React.FC = () => {
                 style={{ backgroundImage: `radial-gradient(${theme === 'blackboard' ? '#FFF' : '#000'} 1px, transparent 1px)`, backgroundSize: '24px 24px' }}
             />
 
-            {/* Theme Badge */}
-            <div className={`absolute top-8 right-12 px-4 py-2 rounded-full border backdrop-blur-md select-none transition-all duration-700 z-10 ${theme === 'blackboard' ? 'bg-white/5 border-white/10 text-stone-600' : 'bg-black/5 border-black/5 text-stone-400'}`}>
-                <span className="text-[10px] font-black uppercase tracking-[0.4em]">MusiClass {theme.charAt(0).toUpperCase() + theme.slice(1)} Mode</span>
+            {/* Branding Watermark */}
+            <div className={`absolute top-8 right-12 opacity-30 hover:opacity-100 transition-opacity duration-700 pointer-events-none z-10 scale-75 md:scale-100 origin-right`}>
+                <Logo light={theme === 'blackboard'} size="md" />
             </div>
         </div>
     );
