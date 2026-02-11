@@ -13,7 +13,7 @@ export const Tuner: React.FC = () => {
     const [targetFrequency, setTargetFrequency] = useState<number | null>(null);
 
     const smoothedPitch = useRef<number | null>(null);
-    const alpha = 0.05;
+    const alpha = 0.03;
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);

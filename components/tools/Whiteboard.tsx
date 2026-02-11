@@ -212,6 +212,11 @@ export const Whiteboard: React.FC = () => {
         setHistory(prev => prev.slice(0, -1));
     };
 
+    const clearCanvas = () => {
+        setHistory(prev => [...prev, strokes].slice(-20));
+        setStrokes([]);
+    };
+
     const exportToPDF = () => {
         if (!canvasRef.current) return;
 
@@ -219,7 +224,7 @@ export const Whiteboard: React.FC = () => {
         redraw();
 
         const imgData = canvasRef.current.toDataURL('image/png');
-        const pdf = jsPDF({
+        const pdf = new jsPDF({
             orientation: 'landscape',
             unit: 'px',
             format: [canvasRef.current.width, canvasRef.current.height]
