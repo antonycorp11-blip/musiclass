@@ -213,6 +213,38 @@ export const Whiteboard: React.FC = () => {
         }
     };
 
+    const distToSegment = (p: Point, v: Point, w: Point) => {
+        const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+        if (l2 === 0) return Math.sqrt(Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2));
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.sqrt(Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + Math.pow(p.y - (v.y + t * (w.y - v.y)), 2));
+    };
+
+    const handleErase = (e: React.MouseEvent | React.TouchEvent) => {
+        const pos = getPos(e);
+        const threshold = 25;
+
+        const filteredStrokes = strokes.filter(stroke => {
+            const isNear = stroke.points.some((p, i) => {
+                if (i === 0) return false;
+                return distToSegment(pos, stroke.points[i - 1], p) < threshold;
+            });
+            return !isNear;
+        });
+
+        if (filteredStrokes.length !== strokes.length) {
+            setHistory(prev => [...prev, strokes].slice(-20));
+            setStrokes(filteredStrokes);
+        }
+    };
+
+    const undo = () => {
+        if (history.length === 0) return;
+        setStrokes(history[history.length - 1]);
+        setHistory(prev => prev.slice(0, -1));
+    };
+
     const clearCanvas = () => {
         setHistory(prev => [...prev, strokes].slice(-20));
         setStrokes([]);
