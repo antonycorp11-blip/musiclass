@@ -6,7 +6,8 @@ export enum Instrument {
   DRUMS = 'Bateria',
   PIANO = 'Piano',
   VOCALS = 'Vocais',
-  BASS = 'Baixo'
+  BASS = 'Baixo',
+  VIOLIN = 'Violino'
 }
 
 export enum Level {

@@ -27,7 +27,9 @@ import {
   Disc,
   Volume2,
   Activity,
-  Wrench
+  Wrench,
+  RefreshCw,
+  CloudLightning
 } from 'lucide-react';
 
 import * as XLSX from 'xlsx';
@@ -44,6 +46,32 @@ import { SoloEditor } from './components/SoloEditor';
 import { Logo } from './components/Logo';
 import { supabase } from './lib/supabase';
 import { ManualChordEditor } from './components/ManualChordEditor';
+import { emusysService } from './services/emusysService';
+
+const normalizeKey = (s: string) => {
+  if (!s) return "";
+  return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+};
+
+const isSimilar = (n1: string, n2: string) => {
+  const norm1 = normalizeKey(n1);
+  const norm2 = normalizeKey(n2);
+  if (norm1 === norm2) return true;
+
+  // Se um nome contém o outro completamente (ex: "AQUILLES" dentro de "AQUILLES SANTOS")
+  if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+  const words1 = norm1.split(/\s+/).filter(w => w.length > 2);
+  const words2 = norm2.split(/\s+/).filter(w => w.length > 2);
+  if (words1.length === 0 || words2.length === 0) return false;
+
+  // Interseção de palavras
+  const set2 = new Set(words2);
+  const common = words1.filter(w => set2.has(w));
+
+  // Se compartilham 2 ou mais nomes significativos
+  return common.length >= 2;
+};
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Teacher | null>(null);
@@ -268,6 +296,127 @@ const App: React.FC = () => {
   };
 
 
+  const handleEmusysSync = async () => {
+    if (!currentUser) return;
+    const token = process.env.VITE_EMUSYS_API_KEY;
+    if (!token) return alert("Chave API do Emusys não configurada nas variáveis de ambiente.");
+
+    setLoading(true);
+    try {
+      const emusysStudents = await emusysService.fetchActiveStudents(token);
+      if (!emusysStudents || emusysStudents.length === 0) {
+        throw new Error("Nenhum aluno retornado pelo Emusys.");
+      }
+
+      const batch: any[] = [];
+      const toUpdate: any[] = [];
+      let missingTeachers = new Set<string>();
+
+      for (const eStudent of emusysStudents) {
+        const fullName = eStudent.nome.trim();
+        const extractedTeacherName = eStudent.professor.trim();
+        const instrumentRaw = eStudent.instrumento.trim();
+
+        let instrument = Instrument.GUITAR;
+        const lowerInst = instrumentRaw.toLowerCase();
+        if (lowerInst.includes('guitarra') || lowerInst.includes('electric')) instrument = Instrument.ELECTRIC_GUITAR;
+        else if (lowerInst.includes('teclado') || lowerInst.includes('keyboard')) instrument = Instrument.KEYBOARD;
+        else if (lowerInst.includes('piano')) instrument = Instrument.PIANO;
+        else if (lowerInst.includes('bateria') || lowerInst.includes('drums')) instrument = Instrument.DRUMS;
+        else if (lowerInst.includes('vocal') || lowerInst.includes('voice') || lowerInst.includes('canto')) instrument = Instrument.VOCALS;
+        else if (lowerInst.includes('baixo') || lowerInst.includes('bass')) instrument = Instrument.BASS;
+        else if (lowerInst.includes('viol') || lowerInst.includes('guitar')) instrument = Instrument.GUITAR;
+        else if (lowerInst.includes('violin')) instrument = Instrument.VIOLIN;
+
+        let teacherId: string | null = null;
+
+        if (extractedTeacherName) {
+          const match = teachers.find(t => isSimilar(t.name, extractedTeacherName));
+          if (match) {
+            teacherId = match.id;
+          } else {
+            console.warn(`Docente não encontrado no MusiClass: "${extractedTeacherName}". O aluno ficará sem professor atribuído.`);
+            missingTeachers.add(extractedTeacherName);
+          }
+        } else {
+          // Se o Emusys não informa professor, atribui ao usuário que está sincronizando (fallback)
+          teacherId = currentUser.id;
+        }
+
+        const existingStudent = students.find(s => s.name.toLowerCase() === fullName.toLowerCase());
+        const inBatch = batch.some(s => s.name.toLowerCase() === fullName.toLowerCase());
+
+        if (existingStudent) {
+          // Se o aluno existe mas o nome (casing) ou instrumento mudou, atualiza
+          const nameChanged = existingStudent.name !== fullName;
+          const instrumentChanged = existingStudent.instrument !== instrument;
+
+          if (nameChanged || instrumentChanged) {
+            console.log(`📝 Atualizando aluno existente: ${existingStudent.name} -> ${fullName} (${instrument})`);
+            toUpdate.push({
+              id: existingStudent.id,
+              name: fullName,
+              instrument
+            });
+          }
+        } else if (!inBatch) {
+          const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(teacherId);
+          batch.push({
+            name: fullName,
+            instrument,
+            level: Level.BEGINNER,
+            teacher_id: isValidUUID ? teacherId : null
+          });
+        }
+      }
+
+      // Executar Atualizações
+      if (toUpdate.length > 0) {
+        for (const up of toUpdate) {
+          await supabase.from('mc_students').update({
+            name: up.name,
+            instrument: up.instrument
+          }).eq('id', up.id);
+        }
+      }
+
+      // Remover alunos que não estão mais no Emusys (ou que viraram experimentais e foram filtrados)
+      const emusysNamesMatch = new Set(emusysStudents.map(es => es.nome.toLowerCase().trim()));
+      const toDelete = students.filter(s => !emusysNamesMatch.has(s.name.toLowerCase().trim()));
+
+      if (toDelete.length > 0) {
+        console.log(`🗑️ Removendo ${toDelete.length} alunos experimentais ou ausentes...`);
+        const idsToDelete = toDelete.map(s => s.id);
+        const { error: delError } = await supabase.from('mc_students').delete().in('id', idsToDelete);
+        if (delError) console.error("Erro ao remover alunos:", delError);
+      }
+
+      if (batch.length > 0) {
+        const { error } = await supabase.from('mc_students').insert(batch);
+        if (error) {
+          console.error("Erro na sincronização:", error);
+          throw new Error(`Erro ao salvar alunos: ${error.message}`);
+        }
+      }
+
+      if (batch.length > 0 || toUpdate.length > 0 || toDelete.length > 0) {
+        await fetchInitialData();
+        let msg = `${batch.length} novos alunos adicionados, ${toUpdate.length} atualizados e ${toDelete.length} removidos!`;
+        if (missingTeachers.size > 0) {
+          msg += `\n\nAtenção: ${missingTeachers.size} professores não reconhecidos.`;
+        }
+        alert(msg);
+      } else {
+        alert("Sincronização concluída. Nenhum aluno novo ou alteração detectada.");
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      alert(`Erro na sincronização: ${error instanceof Error ? error.message : "Falha desconhecida"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
@@ -420,7 +569,9 @@ const App: React.FC = () => {
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder.current = new MediaRecorder(stream);
+
+      const options = { audioBitsPerSecond: 128000 };
+      mediaRecorder.current = new MediaRecorder(stream, options);
       audioChunks.current = [];
 
       mediaRecorder.current.ondataavailable = (e) => {
@@ -488,7 +639,13 @@ const App: React.FC = () => {
             .from('lesson-audios')
             .upload(fileName, rec.blob);
 
-          if (!error && data) {
+          if (error) {
+            console.error("Erro ao subir áudio:", error);
+            alert(`Erro ao salvar áudio "${rec.title}". A aula será salva sem este arquivo.`);
+            continue;
+          }
+
+          if (data) {
             const { data: { publicUrl } } = supabase.storage
               .from('lesson-audios')
               .getPublicUrl(fileName);
@@ -646,6 +803,9 @@ const App: React.FC = () => {
                   <Upload className="w-4 h-4 text-[#E87A2C]" /> Subir Planilha
                   <input type="file" onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                 </label>
+                <button onClick={handleEmusysSync} className="bg-white border-2 border-[#E87A2C] text-[#E87A2C] px-6 py-3.5 md:py-4 rounded-2xl md:rounded-3xl flex items-center justify-center gap-3 shadow-sm hover:bg-[#E87A2C] hover:text-white transition-all font-black text-[10px] md:text-xs uppercase tracking-widest flex-1 sm:flex-none">
+                  <RefreshCw className="w-4 h-4" /> Sincronizar Emusys
+                </button>
                 <button onClick={() => setIsAddingStudent(true)} className="bg-[#1A110D] text-white px-6 py-3.5 md:py-4 rounded-2xl md:rounded-3xl flex items-center justify-center gap-3 shadow-xl hover:bg-[#3C2415] transition-all font-black text-[10px] md:text-xs uppercase tracking-widest flex-1 sm:flex-none">
                   <Plus className="w-4 h-4" /> Novo Aluno
                 </button>
@@ -857,7 +1017,7 @@ const App: React.FC = () => {
                 )}
 
                 {/* MusiClass Studio - Gravador e Guia de Treino */}
-                {(selectedStudent?.instrument === Instrument.VOCALS || selectedStudent?.instrument === Instrument.DRUMS) && (
+                {selectedStudent && (
                   <section className="bg-[#1A110D] rounded-[48px] p-10 shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 rounded-full -mr-32 -mt-32 animate-pulse" />
 
@@ -872,7 +1032,7 @@ const App: React.FC = () => {
                         </div>
                       </div>
 
-                      {selectedStudent?.instrument === Instrument.VOCALS && (
+                      {selectedStudent && (
                         <div className="flex flex-col items-center py-6 border-b border-white/5 mb-8">
                           <button
                             onClick={isRecording ? stopRecording : startRecording}

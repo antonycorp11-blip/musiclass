@@ -14,12 +14,14 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
     const [selectedNotes, setSelectedNotes] = useState<number[]>([]);
 
     // Guitar specific state: [stringIndex, fretIndex]
-    // fret -1 = X, fret 0 = O, frets 1-5 = normal
-    const [guitarFingers, setGuitarFingers] = useState<{ s: number, f: number }[]>([]);
+    // fret -1 = X, fret 0 = O, frets 1-12 = normal
+    const [guitarFingers, setGuitarFingers] = useState<{ s: number, f: number, finger: number }[]>([]);
+    const [selectedFinger, setSelectedFinger] = useState<number>(1);
 
     const isKeyboard = instrument === Instrument.KEYBOARD || instrument === Instrument.PIANO;
     const isBass = instrument === Instrument.BASS;
-    const numStrings = isBass ? 4 : 6;
+    const isViolin = instrument === Instrument.VIOLIN;
+    const numStrings = (isBass || isViolin) ? 4 : 6;
     const stringIndices = Array.from({ length: numStrings }, (_, i) => i);
 
     const toggleKeyboardNote = (noteIdx: number) => {
@@ -32,10 +34,10 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
 
     const toggleGuitarFinger = (s: number, f: number) => {
         const exists = guitarFingers.find(gf => gf.s === s && gf.f === f);
-        if (exists) {
+        if (exists && exists.finger === selectedFinger) {
             setGuitarFingers(guitarFingers.filter(gf => !(gf.s === s && gf.f === f)));
         } else {
-            setGuitarFingers([...guitarFingers.filter(gf => gf.s !== s), { s, f }]);
+            setGuitarFingers([...guitarFingers.filter(gf => gf.s !== s), { s, f, finger: selectedFinger }]);
         }
     };
 
@@ -47,8 +49,8 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
         } else {
             // Reconstruct notesWithIndices: [string, fret, finger]
             const fingerData = guitarFingers
-                .filter(gf => gf.f !== -1) // Don't pass quiet strings to notesWithIndices (ChordVisualizer handles null)
-                .map(gf => [gf.s + 1, gf.f, 1]);
+                .filter(gf => gf.f >= 0)
+                .map(gf => [gf.s + 1, gf.f, gf.finger]);
 
             // However, we need to tell ChordVisualizer about ALL strings.
             // Let's create a full string array
@@ -124,13 +126,15 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                             <div className="flex flex-col items-center">
                                 <p className="text-[8px] font-black text-[#E87A2C] uppercase tracking-[0.4em] mb-10 opacity-40">Braço Vertical Giga Size (MusiClass Design)</p>
 
-                                <div className="relative w-64 h-96 bg-white border-x-[6px] border-b-[6px] border-stone-200 rounded-b-[32px] shadow-2xl overflow-visible">
+                                <div className="relative w-64 h-[450px] bg-white border-x-[6px] border-b-[6px] border-stone-200 rounded-b-[32px] shadow-2xl overflow-y-auto overflow-x-visible custom-scrollbar">
                                     {/* Nut */}
-                                    <div className="absolute top-0 w-full h-4 bg-[#1A110D] -mt-2 rounded-sm z-20 shadow-sm" />
+                                    <div className="sticky top-0 w-full h-6 bg-[#1A110D] -mt-1 rounded-sm z-40 shadow-sm flex items-center justify-center">
+                                        <div className="w-full h-[2px] bg-white/20" />
+                                    </div>
 
                                     {/* Fret Lines */}
-                                    {[1, 2, 3, 4, 5].map(f => (
-                                        <div key={f} className="absolute w-full h-[2px] bg-stone-100" style={{ top: `${f * 20}%` }} />
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(f => (
+                                        <div key={f} className="absolute w-full h-[1px] bg-stone-100" style={{ top: `${(f / 12) * 100}%` }} />
                                     ))}
 
                                     {/* String Lines */}
@@ -139,27 +143,28 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                                     ))}
 
                                     {/* Interactive Dots for Frets */}
-                                    {[1, 2, 3, 4, 5].map(f => (
-                                        <div key={f} className="absolute w-full h-[20%] flex justify-between px-0" style={{ top: `${(f - 1) * 20}%` }}>
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(f => (
+                                        <div key={f} className="absolute w-full h-[8.33%] flex justify-between px-0" style={{ top: `${((f - 1) / 12) * 100}%` }}>
                                             {stringIndices.map(s => {
-                                                const isActive = guitarFingers.find(gf => gf.s === s && gf.f === f);
+                                                const active = guitarFingers.find(gf => gf.s === s && gf.f === f);
                                                 return (
                                                     <button
                                                         key={`${s}-${f}`}
                                                         onClick={() => toggleGuitarFinger(s, f)}
-                                                        className={`absolute w-12 h-12 -ml-6 rounded-full z-30 transition-all flex items-center justify-center text-sm font-black transform translate-y-4
-                                                            ${isActive ? 'bg-[#E87A2C] text-white shadow-xl scale-125' : 'bg-transparent hover:bg-orange-500/10'}`}
+                                                        className={`absolute w-10 h-10 -ml-5 rounded-full z-30 transition-all flex items-center justify-center text-xs font-black transform translate-y-2
+                                                            ${active ? 'bg-[#E87A2C] text-white shadow-xl scale-110' : 'bg-transparent hover:bg-orange-500/10'}`}
                                                         style={{ left: `${s * (100 / (numStrings - 1))}%` }}
                                                     >
-                                                        {isActive ? '1' : ''}
+                                                        {active ? active.finger : ''}
                                                     </button>
                                                 );
                                             })}
+                                            <span className="absolute -left-10 top-1/2 -translate-y-1/2 text-[8px] font-black text-stone-300">{f}</span>
                                         </div>
                                     ))}
 
                                     {/* Interactive Dots for Open/Quiet Strings */}
-                                    <div className="absolute -top-12 w-full h-10 flex justify-between">
+                                    <div className="absolute -top-10 w-full h-10 flex justify-between">
                                         {stringIndices.map(s => {
                                             const fretOnThisString = guitarFingers.find(gf => gf.s === s);
                                             const isQuiet = fretOnThisString?.f === -1;
@@ -183,9 +188,23 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
                                         })}
                                     </div>
                                 </div>
-                                <div className="mt-12 flex gap-12 bg-stone-50 px-8 py-3 rounded-2xl border border-stone-100">
-                                    <div className="flex items-center gap-2"><span className="text-emerald-500 font-bold text-lg">O</span> <span className="text-[10px] uppercase font-black text-stone-400 tracking-widest">Aberta</span></div>
-                                    <div className="flex items-center gap-2"><span className="text-rose-500 font-bold text-lg">X</span> <span className="text-[10px] uppercase font-black text-stone-400 tracking-widest">Muda</span></div>
+
+                                <div className="mt-8 flex flex-col items-center gap-6">
+                                    <div className="flex gap-3">
+                                        {[1, 2, 3, 4].map(num => (
+                                            <button
+                                                key={num}
+                                                onClick={() => setSelectedFinger(num)}
+                                                className={`w-10 h-10 rounded-full font-black text-sm transition-all ${selectedFinger === num ? 'bg-[#E87A2C] text-white scale-110 shadow-lg' : 'bg-stone-100 text-stone-400'}`}
+                                            >
+                                                {num}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-12 bg-stone-50 px-8 py-3 rounded-2xl border border-stone-100">
+                                        <div className="flex items-center gap-2"><span className="text-emerald-500 font-bold text-lg">O</span> <span className="text-[10px] uppercase font-black text-stone-400 tracking-widest">Aberta</span></div>
+                                        <div className="flex items-center gap-2"><span className="text-rose-500 font-bold text-lg">X</span> <span className="text-[10px] uppercase font-black text-stone-400 tracking-widest">Muda</span></div>
+                                    </div>
                                 </div>
                             </div>
                         )}

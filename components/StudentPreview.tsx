@@ -51,6 +51,22 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         return () => window.removeEventListener('resize', updateScale);
     }, []);
 
+    const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const togglePlay = (url: string) => {
+        if (playingUrl === url) {
+            audioRef.current?.pause();
+            setPlayingUrl(null);
+        } else {
+            if (audioRef.current) {
+                audioRef.current.src = url;
+                audioRef.current.play();
+                setPlayingUrl(url);
+            }
+        }
+    };
+
     const handleDownloadPDF = async () => {
         setIsExporting(true);
         try {
@@ -221,7 +237,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                         </div>
                                         <span className="text-[11px] font-black text-stone-500 uppercase">{chords.length} ACORDES</span>
                                     </div>
-                                    <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') ? 'grid-cols-4' : 'grid-cols-2'} gap-4`}>
+                                    <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') || instrument?.toLowerCase().includes('violino') ? 'grid-cols-4' : 'grid-cols-2'} gap-4`}>
                                         {chords.map((chord, i) => (
                                             <ChordVisualizer
                                                 key={i}
@@ -361,15 +377,18 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                     return (
                                                         <div
                                                             key={rIdx}
-                                                            className={`bg-[#1A110D] p-6 rounded-[24px] ${rec ? 'audio-card-pdf cursor-pointer' : ''}`}
+                                                            onClick={rec?.url ? () => togglePlay(rec.url) : undefined}
+                                                            className={`bg-[#1A110D] p-6 rounded-[24px] border-2 transition-all ${rec ? 'audio-card-pdf cursor-pointer hover:border-[#E87A2C]/40' : 'border-transparent'} ${playingUrl === rec?.url ? 'border-[#E87A2C]' : 'border-transparent'}`}
                                                             data-url={rec?.url}
                                                         >
                                                             <div className="flex justify-between items-center mb-6">
                                                                 <p className="text-[9px] font-black text-[#E87A2C] uppercase tracking-widest">{r.title}</p>
                                                                 {rec && (
-                                                                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                                                                        <Headphones className="w-3 h-3 text-[#E87A2C]" />
-                                                                        <span className="text-[7px] font-black text-white uppercase tracking-widest">Ouvir Loop</span>
+                                                                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${playingUrl === rec.url ? 'bg-[#E87A2C] border-[#E87A2C]' : 'bg-white/5 border-white/10'}`}>
+                                                                        <Headphones className={`w-3 h-3 ${playingUrl === rec.url ? 'text-white' : 'text-[#E87A2C]'}`} />
+                                                                        <span className={`text-[7px] font-black uppercase tracking-widest ${playingUrl === rec.url ? 'text-white' : 'text-white'}`}>
+                                                                            {playingUrl === rec.url ? 'REPRODUZINDO' : 'Ouvir Loop'}
+                                                                        </span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -446,15 +465,22 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                             <div
                                                 key={rec.id}
                                                 data-url={rec.url}
-                                                className="audio-card-pdf bg-[#1A110D] p-5 rounded-[24px] border border-white/5 shadow-xl flex items-center justify-between group transition-all cursor-pointer"
+                                                onClick={() => togglePlay(rec.url)}
+                                                className={`audio-card-pdf p-5 rounded-[24px] border shadow-xl flex items-center justify-between group transition-all cursor-pointer ${playingUrl === rec.url ? 'bg-[#E87A2C] border-[#E87A2C]' : 'bg-[#1A110D] border-white/5'}`}
                                             >
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-                                                        <Play className="w-5 h-5 fill-current" />
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${playingUrl === rec.url ? 'bg-white text-[#E87A2C]' : 'bg-[#E87A2C] shadow-orange-500/20'}`}>
+                                                        {playingUrl === rec.url ? (
+                                                            <Headphones className="w-5 h-5 animate-bounce" />
+                                                        ) : (
+                                                            <Play className="w-5 h-5 fill-current" />
+                                                        )}
                                                     </div>
                                                     <div>
-                                                        <p className="text-[11px] font-black text-white uppercase tracking-tight leading-tight">{rec.title || 'Referência MusiClass'}</p>
-                                                        <p className="text-[8px] font-bold text-stone-500 uppercase tracking-widest mt-1.5">Clique para ouvir no PDF</p>
+                                                        <p className={`text-[11px] font-black uppercase tracking-tight leading-tight ${playingUrl === rec.url ? 'text-white' : 'text-white'}`}>{rec.title || 'Referência MusiClass'}</p>
+                                                        <p className={`text-[8px] font-bold uppercase tracking-widest mt-1.5 ${playingUrl === rec.url ? 'text-white/60' : 'text-stone-500'}`}>
+                                                            {playingUrl === rec.url ? 'REPRODUZINDO...' : 'Clique para ouvir no PDF'}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -475,6 +501,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                     </div>
                 </div>
             </div>
+            <audio ref={audioRef} onEnded={() => setPlayingUrl(null)} className="hidden" />
         </div>
     );
 };
