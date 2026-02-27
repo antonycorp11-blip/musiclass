@@ -1,7 +1,7 @@
 
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Student, Teacher, ChordDefinition } from '../types';
+import { Instrument, Student, Teacher, ChordDefinition } from '../types';
 import { MusicEngine } from '../services/musicEngine';
 import { SCALES } from '../constants';
 
@@ -46,15 +46,40 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
     }, []);
 
     const saveManualChord = useCallback((name: string, notes: number[], isCustom: boolean) => {
+        // notes structure is [string, fret, finger, string, fret, finger...]
+        const noteNames: string[] = [];
+
+        // Smarter string count detection: if notes[0] is > 4, it's likely a 6-string instrument
+        // Or better, let's just check the existing system state if possible, 
+        // but for now, we'll try to infer or default based on the student.
+        const isBass = selectedStudent?.instrument === Instrument.BASS;
+        // In template mode, we'll look at the notes array to see if string index 5 or 6 is used
+        let numStrings = isBass ? 4 : 6;
+
+        for (let j = 0; j < notes.length; j += 3) {
+            if (notes[j] > 4) numStrings = 6;
+        }
+
+        for (let i = 0; i < notes.length; i += 3) {
+            const s = notes[i] - 1; // 1-indexed string to 0-indexed
+            const f = notes[i + 1];
+            if (f >= 0) {
+                const noteName = MusicEngine.getNoteByFretAndString(f, s, numStrings);
+                if (!noteNames.includes(noteName)) {
+                    noteNames.push(noteName);
+                }
+            }
+        }
+
         setCurrentChords(prev => [...prev, {
             root: name,
-            notes: [],
+            notes: noteNames,
             notesWithIndices: notes,
             typeId: '',
             extId: '',
             isCustom
         }]);
-    }, []);
+    }, [selectedStudent?.instrument]);
 
     const addScale = useCallback((root: string, scaleId: string) => {
         const notes = MusicEngine.generateScale(root, scaleId);
@@ -106,7 +131,19 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
                 throw new Error("Seu navegador não suporta gravação de áudio ou o acesso foi negado.");
             }
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const options = { audioBitsPerSecond: 128000 };
+
+            // Detect supported mime type (especially for iOS)
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm')
+                ? 'audio/webm'
+                : MediaRecorder.isTypeSupported('audio/mp4')
+                    ? 'audio/mp4'
+                    : 'audio/aac';
+
+            const options = {
+                audioBitsPerSecond: 128000,
+                mimeType
+            };
+
             mediaRecorder.current = new MediaRecorder(stream, options);
             audioChunks.current = [];
 
@@ -115,13 +152,16 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
             };
 
             mediaRecorder.current.onstop = () => {
-                const blob = new Blob(audioChunks.current, { type: 'audio/webm' });
+                const blob = new Blob(audioChunks.current, { type: mimeType });
                 const url = URL.createObjectURL(blob);
+                const fileExtension = mimeType.split('/')[1] === 'webm' ? 'webm' : 'mp4';
+
                 const newRecording = {
                     id: Math.random().toString(36).substr(2, 9),
                     title: `Guia Vocal ${recordings.length + 1}`,
                     blob,
-                    url
+                    url,
+                    extension: fileExtension
                 };
                 setRecordings(prev => [...prev, newRecording]);
                 stream.getTracks().forEach(track => track.stop());
@@ -163,7 +203,8 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
             for (let i = 0; i < finalRecordings.length; i++) {
                 const rec = finalRecordings[i];
                 if (rec.blob) {
-                    const fileName = `guide-${selectedStudent.id}-${Date.now()}-${rec.id}.webm`;
+                    const ext = (rec as any).extension || 'webm';
+                    const fileName = `guide-${selectedStudent.id}-${Date.now()}-${rec.id}.${ext}`;
                     const { data, error } = await supabase.storage
                         .from('lesson-audios')
                         .upload(fileName, rec.blob);

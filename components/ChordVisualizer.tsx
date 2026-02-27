@@ -79,7 +79,6 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
       </div>
 
       <div className="p-6 bg-[#FBF6F0] flex flex-col items-center">
-        <p className="text-[#E87A2C] font-black uppercase tracking-[0.4em] text-[8px] mb-5 opacity-40 italic">{instrument} {isCustom ? 'Custom' : 'Standard'}</p>
 
         <div className={`relative ${isFullscreen ? 'w-72 h-[400px]' : 'w-32 h-48'} bg-white border-x-[4px] border-b-[4px] border-[#3C2415] rounded-b-xl shadow-2xl mt-1 relative z-10`}>
           {/* Top Nut or Fret Label */}
@@ -161,8 +160,8 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
         </div>
       </div>
 
-      <div className="bg-white py-3 px-5 flex justify-center border-t border-stone-100 italic">
-        <span className="text-[8px] font-black text-stone-300 uppercase tracking-[0.4em]">MusiClass Digital Diagram</span>
+      <div className="bg-stone-50 py-3 px-5 flex justify-center border-t border-stone-100 italic">
+        <span className="text-[10px] font-black text-stone-300 uppercase tracking-widest leading-none">Diagrama Digital</span>
       </div>
     </div>
   );

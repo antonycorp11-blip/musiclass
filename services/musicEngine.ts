@@ -48,4 +48,13 @@ export class MusicEngine {
     if (!scale) return null;
     return scale.intervals.map(i => this.getNoteFromInterval(root, i).name);
   }
+  static getNoteByFretAndString(fret: number, stringIndex: number, numStrings: number = 6) {
+    // Standard Vertical Diagram: Left-to-Right = Low-to-High strings
+    const standardGuitar = ['E', 'A', 'D', 'G', 'B', 'E'];
+    const standardBass = ['E', 'A', 'D', 'G'];
+
+    const tuning = numStrings === 4 ? standardBass : standardGuitar;
+    const rootNote = tuning[stringIndex] || 'C';
+    return this.getNoteFromInterval(rootNote, fret).name;
+  }
 }

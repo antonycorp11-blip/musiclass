@@ -410,7 +410,9 @@ const App: React.FC = () => {
             recordings={recordings} setRecordings={setRecordings}
             isRecording={isRecording}
             onAddChord={() => addChord(selRoot, selType, selExt, selBass)}
-            onAddScale={addScale} onAddTab={addTab} onAddSolo={addSolo}
+            onAddScale={() => addScale(selScaleRoot, selScaleId)}
+            onAddTab={addTab}
+            onAddSolo={addSolo}
             onUpdateTab={updateTab} onUpdateSolo={updateSolo} onRemoveTab={removeTab}
             onAddExercise={addExercise} onRemoveExercise={removeExercise}
             onStartRecording={startRecording} onStopRecording={stopRecording}
@@ -484,8 +486,12 @@ const App: React.FC = () => {
         />
       )}
 
-      {isManualChordOpen && selectedStudent && (
-        <ManualChordEditor instrument={selectedStudent.instrument} onClose={() => setIsManualChordOpen(false)} onSave={saveManualChord} />
+      {isManualChordOpen && (
+        <ManualChordEditor
+          instrument={selectedStudent?.instrument || Instrument.GUITAR}
+          onClose={() => setIsManualChordOpen(false)}
+          onSave={saveManualChord}
+        />
       )}
 
       {isAddingStudent && (
