@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import { ChordVisualizer } from './ChordVisualizer';
 import { Logo } from './Logo';
 import { Instrument, Level, SoloNote } from '../types';
-import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones } from 'lucide-react';
+import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones, Clock } from 'lucide-react';
 
 
 interface StudentPreviewProps {
@@ -20,12 +20,14 @@ interface StudentPreviewProps {
     solos?: { title: string, notes: SoloNote[] }[];
     recordings?: { id: string, title: string, url: string }[];
     drums?: { rhythms: any[], rudiments: any[] };
+    lessonCount?: number;
+    contractTotal?: number;
     onClose: () => void;
     onExport?: () => Promise<any[]>;
 }
 
 export const StudentPreview: React.FC<StudentPreviewProps> = ({
-    studentName, teacherName, instrument, objective, chords, scales, exercises, tabs, solos = [], recordings = [], drums = { rhythms: [], rudiments: [] }, onClose, onExport
+    studentName, teacherName, instrument, objective, chords, scales, exercises, tabs, solos = [], recordings = [], drums = { rhythms: [], rudiments: [] }, lessonCount, contractTotal, onClose, onExport
 }) => {
     const today = new Date().toLocaleDateString('pt-BR');
     const documentRef = useRef<HTMLDivElement>(null);
@@ -64,6 +66,112 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 audioRef.current.play();
                 setPlayingUrl(url);
             }
+        }
+    };
+
+    const handleDownloadPrintPDF = async () => {
+        setIsExporting(true);
+        try {
+            console.log('Iniciando exportação de PDF para Impressão (A4 Paginação)...');
+            if (onExport) await onExport();
+            // Pequeno delay para garantir que o layout adaptativo (colunas) foi aplicado
+            await new Promise(r => setTimeout(r, 1000));
+
+            const headerElem = document.getElementById('lesson-header');
+            const bodyElem = document.getElementById('lesson-body');
+
+            if (!headerElem || !bodyElem) {
+                alert("Erro ao identificar componentes para impressão.");
+                setIsExporting(false);
+                return;
+            }
+
+            // --- CONFIGURAÇÃO DE IMPRESSÃO PROFISSIONAL ---
+            const pdfWidth = 210; // A4 Width
+            const pdfPageHeight = 297; // A4 Height
+            const reductionFactor = 0.72; // Redução de ~30% conforme solicitado pelo usuário
+
+            // Largura visual do conteúdo centralizado
+            const contentWidth = pdfWidth * reductionFactor;
+            const xOffset = (pdfWidth - contentWidth) / 2;
+
+            // 1. Captura do Cabeçalho (Fixo em todas as páginas)
+            const headerCanvas = await html2canvas(headerElem, {
+                scale: 3,
+                useCORS: true,
+                backgroundColor: '#1A110D',
+                windowWidth: 1000 // Garante proporções de desktop para clareza
+            });
+            const headerImgData = headerCanvas.toDataURL('image/png', 1.0);
+            const headerPdfHeight = (headerCanvas.height * pdfWidth) / headerCanvas.width;
+
+            // 2. Captura do Corpo Completo
+            const bodyCanvas = await html2canvas(bodyElem, {
+                scale: 3,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                windowWidth: 1000
+            });
+            const bodyImgData = bodyCanvas.toDataURL('image/png', 1.0);
+
+            // Altura real que o corpo ocupará no PDF
+            const bodyVisualHeight = (bodyCanvas.height * contentWidth) / bodyCanvas.width;
+
+            const pdf = new jsPDF({
+                orientation: 'p',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+
+            // --- LÓGICA DE PAGINAÇÃO E REPETIÇÃO DE CABEÇALHO ---
+            const bodyAvailableHeightPerPage = pdfPageHeight - headerPdfHeight - 10; // 10mm margem segurança
+            let heightRemaining = bodyVisualHeight;
+            let currentOffset = 0;
+
+            while (heightRemaining > 0) {
+                // Passo A: Desenha o Corpo (imagem fatiada pelo offset negativo)
+                // O corpo começa logo abaixo do cabeçalho
+                pdf.addImage(
+                    bodyImgData,
+                    'PNG',
+                    xOffset,
+                    headerPdfHeight - currentOffset,
+                    contentWidth,
+                    bodyVisualHeight,
+                    undefined,
+                    'FAST'
+                );
+
+                // Passo B: Máscara de Proteção (Garante que o corpo não vaze para trás do cabeçalho)
+                pdf.setFillColor(255, 255, 255);
+                pdf.rect(0, 0, pdfWidth, headerPdfHeight, 'F');
+
+                // Passo C: Desenha o Cabeçalho (Sempre no topo, sobrepondo qualquer vazamento)
+                pdf.addImage(headerImgData, 'PNG', 0, 0, pdfWidth, headerPdfHeight, undefined, 'FAST');
+
+                // Passo D: Limpeza do Rodapé (Evita que o conteúdo vaze para a margem física da impressora)
+                if (heightRemaining > bodyAvailableHeightPerPage) {
+                    pdf.setFillColor(255, 255, 255);
+                    pdf.rect(0, pdfPageHeight - 5, pdfWidth, 5, 'F');
+                }
+
+                heightRemaining -= bodyAvailableHeightPerPage;
+                currentOffset += bodyAvailableHeightPerPage;
+
+                if (heightRemaining > 0) {
+                    pdf.addPage();
+                }
+            }
+
+            pdf.save(`${studentName} - IMPRESSAO - ${today}.pdf`);
+            alert("PDF Profissional para Impressão gerado com sucesso!");
+
+        } catch (error) {
+            console.error('Erro no Print PDF:', error);
+            alert('Falha interna na geração do PDF de Impressão.');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -154,16 +262,24 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                     <button
                         onClick={handleDownloadPDF}
                         disabled={isExporting}
-                        className={`${isExporting ? 'bg-stone-500 animate-pulse' : 'bg-[#E87A2C] hover:bg-orange-600'} px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10`}
+                        className={`${isExporting ? 'bg-stone-500 animate-pulse' : 'bg-white/10 hover:bg-white/20'} px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10`}
                     >
                         {isExporting ? (
-                            <>Sincronizando...</>
+                            <><Clock className="w-3.5 h-3.5 animate-spin" /> Gerando...</>
                         ) : (
                             <>
                                 <FileText className="w-3.5 h-3.5" />
-                                Gerar PDF da Aula
+                                PDF Digital
                             </>
                         )}
+                    </button>
+                    <button
+                        onClick={handleDownloadPrintPDF}
+                        disabled={isExporting}
+                        className={`${isExporting ? 'bg-stone-500 animate-pulse' : 'bg-[#E87A2C] hover:bg-orange-600'} px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 text-white border border-white/10`}
+                    >
+                        <GraduationCap className="w-4 h-4" />
+                        PDF para Impressão
                     </button>
                     <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-all">
                         <X className="w-4 h-4" />
@@ -188,7 +304,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                     }}
                 >
                     {/* Slim Header */}
-                    <div className="bg-[#1A110D] border-b-[6px] border-[#E87A2C]">
+                    <div id="lesson-header" className="bg-[#1A110D] border-b-[6px] border-[#E87A2C]">
                         <div className="p-10 flex flex-row justify-between items-center gap-12">
                             {/* Brand & Instrument */}
                             <div className="flex flex-col gap-4">
@@ -203,7 +319,14 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             <div className="flex gap-12">
                                 <div className="flex flex-col border-l-2 border-[#E87A2C] pl-5">
                                     <span className="text-[13px] font-black text-white uppercase tracking-tight leading-tight">{studentName}</span>
-                                    <span className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest mt-1">{today}</span>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <span className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">{today}</span>
+                                        {contractTotal && contractTotal > 0 && (
+                                            <span className="text-[9px] font-black text-white bg-[#E87A2C] px-2 py-0.5 rounded-md uppercase tracking-tighter">
+                                                Aula {lessonCount} / {contractTotal}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex flex-col border-l-2 border-white/20 pl-5">
                                     <span className="text-[11px] font-black text-white uppercase tracking-tight opacity-70">Prof. {teacherName}</span>
@@ -212,7 +335,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                         </div>
                     </div>
 
-                    <div className="p-6 md:p-10 space-y-10">
+                    <div id="lesson-body" className="p-6 md:p-10 space-y-10">
                         {/* Objetivos */}
                         {objective && (
                             <section className="relative">
@@ -255,73 +378,69 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 </section>
                             )}
 
-                            <div className="grid grid-cols-12 gap-10">
+                            <div className={`grid ${solos.length > 0 && exercises.length > 0 ? 'grid-cols-12' : 'grid-cols-1'} gap-10`}>
                                 {/* Left Side: Solos */}
-                                <div className="col-span-8 space-y-6">
-                                    {solos.length > 0 && instrument !== Instrument.VOCALS && instrument !== Instrument.DRUMS && (
-                                        <section>
-                                            <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Solos e Melodias (Bimanual)</h2>
-                                            <div className="space-y-4">
-                                                {solos.map((solo, i) => (
-                                                    <div key={i} className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
-                                                        <p className="font-black text-[8px] uppercase text-[#E87A2C] mb-4 tracking-widest">{solo.title || `Parte ${i + 1}`}</p>
-                                                        <div className="flex flex-wrap gap-4">
-                                                            {(() => {
-                                                                const maxPos = Math.max(...solo.notes.map(n => n.position || 0), 0);
-                                                                const steps = Array.from({ length: maxPos + 1 });
-                                                                return steps.map((_, stepIdx) => {
-                                                                    const harmonyNotes = solo.notes.filter(n => n.type === 'harmony' && (n.position || 0) === stepIdx);
-                                                                    const soloNotes = solo.notes.filter(n => n.type === 'solo' && (n.position || 0) === stepIdx);
+                                {solos.length > 0 && (
+                                    <div className={`${exercises.length > 0 ? 'col-span-8' : 'col-span-1'} space-y-6`}>
+                                        <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Solos e Melodias (Bimanual)</h2>
+                                        <div className="space-y-4">
+                                            {solos.map((solo, i) => (
+                                                <div key={i} className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
+                                                    <p className="font-black text-[8px] uppercase text-[#E87A2C] mb-4 tracking-widest">{solo.title || `Parte ${i + 1}`}</p>
+                                                    <div className="flex flex-wrap gap-4">
+                                                        {(() => {
+                                                            const maxPos = Math.max(...solo.notes.map(n => n.position || 0), 0);
+                                                            const steps = Array.from({ length: maxPos + 1 });
+                                                            return steps.map((_, stepIdx) => {
+                                                                const harmonyNotes = solo.notes.filter(n => n.type === 'harmony' && (n.position || 0) === stepIdx);
+                                                                const soloNotes = solo.notes.filter(n => n.type === 'solo' && (n.position || 0) === stepIdx);
 
-                                                                    if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
+                                                                if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
 
-                                                                    return (
-                                                                        <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
-                                                                            <div className="flex flex-wrap gap-1 min-h-[20px]">
-                                                                                {harmonyNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
-                                                                                        {n.note}
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                            <div className="h-px bg-stone-200 w-full" />
-                                                                            <div className="flex flex-wrap gap-1 min-h-[20px]">
-                                                                                {soloNotes.map((n, idx) => (
-                                                                                    <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
-                                                                                        {n.note}
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
+                                                                return (
+                                                                    <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
+                                                                        <div className="flex flex-wrap gap-1 min-h-[20px]">
+                                                                            {harmonyNotes.map((n, idx) => (
+                                                                                <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
+                                                                                    {n.note}
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
-                                                                    );
-                                                                });
-                                                            })()}
-                                                        </div>
+                                                                        <div className="h-px bg-stone-200 w-full" />
+                                                                        <div className="flex flex-wrap gap-1 min-h-[20px]">
+                                                                            {soloNotes.map((n, idx) => (
+                                                                                <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
+                                                                                    {n.note}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            });
+                                                        })()}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-                                </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Right Side: Exercises */}
-                                <div className="col-span-4 space-y-10">
-                                    {exercises.length > 0 && (
-                                        <section>
-                                            <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Checklist de Prática</h2>
-                                            <div className="space-y-2">
-                                                {exercises.map((ex, i) => (
-                                                    <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
-                                                        <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-tight">
-                                                            {i + 1}
-                                                        </div>
-                                                        <span className="text-[11px] font-black text-[#3C2415] leading-tight">{ex}</span>
+                                {exercises.length > 0 && (
+                                    <div className={`${solos.length > 0 ? 'col-span-4' : 'col-span-1'} space-y-10`}>
+                                        <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Checklist de Prática</h2>
+                                        <div className={`space-y-2 ${solos.length === 0 ? 'grid grid-cols-2 gap-4 space-y-0' : ''}`}>
+                                            {exercises.map((ex, i) => (
+                                                <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
+                                                    <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-tight">
+                                                        {i + 1}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-                                </div>
+                                                    <span className="text-[11px] font-black text-[#3C2415] leading-tight">{ex}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Tablaturas (Ocultar para Bateria) */}

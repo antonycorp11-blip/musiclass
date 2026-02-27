@@ -2,23 +2,24 @@
 import { Instrument } from '../types';
 
 // O proxy no vite.config.ts redireciona /emusys-api para https://api.emusys.com.br
-const EMUSYS_API_BASE = '/emusys-api/v1';
+const EDGE_FUNCTION_URL = 'https://wayigtlilhvutbfvxgae.supabase.co/functions/v1/emusys-proxy';
 
 export interface EmusysStudent {
     nome: string;
     professor: string;
     instrumento: string;
+    lesson_count?: number;
+    contract_total?: number;
 }
 
 export const emusysService = {
-    fetchActiveStudents: async (token: string): Promise<EmusysStudent[]> => {
+    fetchActiveStudents: async (_token: string): Promise<EmusysStudent[]> => {
         try {
-            console.log("Iniciando busca sincronizada com padrão Confirmaula...");
+            console.log("Iniciando busca sincronizada via Proxy Seguro...");
 
-            // Definindo período de 60 dias (30 passados, 30 futuros) para captar todos os alunos ativos
             const now = new Date();
-            const start = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-            const end = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+            const start = new Date(now.getTime() - (10 * 24 * 60 * 60 * 1000));
+            const end = new Date(now.getTime() + (10 * 24 * 60 * 60 * 1000));
 
             const startDate = start.toISOString().split('T')[0] + ' 00:00:00';
             const endDate = end.toISOString().split('T')[0] + ' 23:59:59';
@@ -27,19 +28,24 @@ export const emusysService = {
             let nextCursor: string | null = null;
             let hasMore = true;
 
-            while (hasMore) {
-                // O Emusys v1 usa o endpoint /aulas para obter dados de alunos vinculados
-                let url = `${EMUSYS_API_BASE}/aulas?token=${token}&data_hora_inicial=${encodeURIComponent(startDate)}&data_hora_final=${encodeURIComponent(endDate)}`;
-                if (nextCursor) url += `&cursor=${encodeURIComponent(nextCursor)}`;
+            const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
-                console.log(`Buscando aulas (cursor: ${nextCursor || 'inicio'})...`);
-                const response = await fetch(url, {
-                    headers: { 'Accept': 'application/json' }
+            while (hasMore) {
+                const path = `/aulas?data_hora_inicial=${encodeURIComponent(startDate)}&data_hora_final=${encodeURIComponent(endDate)}${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ''}`;
+
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ path })
                 });
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Erro API Emusys (${response.status}): ${errorText}`);
+                    const err = await response.json();
+                    const details = err.details || err.content || 'Falha desconhecida';
+                    throw new Error(`Erro Proxy (${response.status}): ${err.error}. Resposta: ${details}`);
                 }
 
                 const data = await response.json();
@@ -52,57 +58,48 @@ export const emusysService = {
                     const course = (lesson.curso_nome || '').toLowerCase();
 
                     const blacklistedTerms = [
-                        'experimental',
-                        'avaliaçao',
-                        'avaliação',
-                        'demonstrativa',
-                        'cortesia',
-                        'bonificaçao',
-                        'bonificação',
-                        'teste'
+                        'experimental', 'avaliaçao', 'avaliação', 'demonstrativa', 'cortesia',
+                        'bonificaçao', 'bonificação', 'teste', 'diagnostica', 'diagnóstica'
                     ];
 
                     const isExperimental = blacklistedTerms.some(term =>
-                        category.includes(term) ||
-                        type.includes(term) ||
-                        turma.includes(term) ||
-                        course.includes(term)
-                    ) || category.includes('reposiçao') || category.includes('reposição') ||
-                        category.includes('diagnostica') || category.includes('diagnóstica');
+                        category.includes(term) || type.includes(term) || turma.includes(term) || course.includes(term)
+                    ) || category.includes('reposiçao') || category.includes('reposição');
 
-                    if (lesson.cancelada || isExperimental) {
-                        if (isExperimental) {
-                            const filteredStudents = lesson.alunos?.map((aluno: any) => aluno.nome_aluno).filter(Boolean).join(', ');
-                            console.log(`🚫 Filtrando aula experimental/reposição/diagnóstica: ${lesson.turma_nome} / ${lesson.categoria}. Alunos: ${filteredStudents || 'N/A'}`);
-                        }
-                        return;
-                    }
+                    if (lesson.cancelada || isExperimental) return;
 
-                    const teacherName = lesson.professores?.[0]?.nome || 'Não Atribuído';
-                    const courseName = lesson.curso_nome || 'Geral';
+                    const teacherName = lesson.professores?.[0]?.nome;
+                    if (!teacherName || teacherName === 'Não Atribuído') return;
+
+                    const courseName = (lesson.curso_nome || '').trim();
+                    const turmaName = (lesson.turma_nome || '').trim();
+                    const lesson_count = lesson.nr_da_aula || 0;
+                    const contract_total = lesson.qtd_aulas_contrato || 0;
 
                     lesson.alunos?.forEach((aluno: any) => {
                         const studentName = aluno.nome_aluno;
+                        let instrumentName = (aluno.instrumento || '').trim();
+
+                        if (!instrumentName || instrumentName.toLowerCase() === 'musica' || instrumentName.toLowerCase() === 'música') {
+                            instrumentName = courseName || turmaName || 'Geral';
+                        }
+
                         if (!studentName) return;
 
-                        // Se o aluno já foi marcado em uma aula experimental anteriormente nesta busca,
-                        // poderíamos removê-lo, mas aqui estamos filtrando por AULA.
-                        // Se o aluno tem 1 aula regular e 1 experimental, ele entra pela regular.
+                        const compositeKey = `${studentName.toLowerCase().trim()}|${instrumentName.toLowerCase().trim()}`;
 
-                        if (!allStudentsMap.has(studentName)) {
-                            allStudentsMap.set(studentName, {
-                                nome: studentName,
-                                professor: teacherName,
-                                instrumento: aluno.instrumento || courseName
-                            });
-                        }
+                        allStudentsMap.set(compositeKey, {
+                            nome: studentName,
+                            professor: teacherName,
+                            instrumento: instrumentName,
+                            lesson_count,
+                            contract_total
+                        });
                     });
                 });
 
                 nextCursor = data.paginacao?.proximo_cursor || null;
                 hasMore = !!(data.paginacao?.tem_mais && nextCursor);
-
-                // Limite de segurança para evitar loops infinitos
                 if (allStudentsMap.size > 2000) break;
             }
 

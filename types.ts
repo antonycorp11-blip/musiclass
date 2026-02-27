@@ -33,6 +33,22 @@ export interface Student {
   teacher_id?: string;
   teacherId?: string; // For backward compatibility in code if needed
   createdAt?: number | string;
+  lesson_count?: number;
+  contract_total?: number;
+}
+
+export interface LessonTemplate {
+  id: string;
+  teacher_id: string;
+  title: string;
+  instrument: string;
+  objective: string;
+  report_data: LessonHistory['report_data'];
+  is_public: boolean;
+  created_at?: string;
+  mc_teachers?: {
+    name: string;
+  };
 }
 
 export interface ChordDefinition {

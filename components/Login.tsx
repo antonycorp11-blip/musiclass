@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { Teacher } from '../types';
 import { User, KeyRound, ChevronRight, Music, Plus, X } from 'lucide-react';
 
@@ -13,14 +13,28 @@ export const Login: React.FC<LoginProps> = ({ teachers, onLogin }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedTeacher && password === selectedTeacher.password) {
-            onLogin(selectedTeacher);
-            setError('');
-        } else {
-            setError('Senha incorreta. Tente novamente.');
-            setPassword('');
+        try {
+            if (selectedTeacher) {
+                const { data, error: loginError } = await supabase.rpc('mc_login_teacher', {
+                    p_name: selectedTeacher.name,
+                    p_password: password
+                });
+
+                if (loginError) throw loginError;
+
+                if (data) {
+                    onLogin(data);
+                    setError('');
+                } else {
+                    setError('Senha incorreta. Tente novamente.');
+                    setPassword('');
+                }
+            }
+        } catch (err: any) {
+            setError('Erro ao conectar com servidor.');
+            console.error("Login failed:", err);
         }
     };
 
