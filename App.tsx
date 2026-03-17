@@ -554,20 +554,20 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden relative">
+    <div className="fixed inset-0 bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
       
       {/* Top Mobile Bar (Fixed at top) */}
-      <div className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5">
-        <div className="flex items-center gap-2">
+      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top">
+        <div className="flex items-center">
           <Logo light size="sm" />
         </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 bg-white/10 rounded-xl"
+          className="p-3 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
         >
           <Menu className="w-6 h-6" />
         </button>
-      </div>
+      </header>
 
       {/* Modern Sidebar (Overlay on Mobile, Fixed on Desktop) */}
       <nav className={`

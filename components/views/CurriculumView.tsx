@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-    BookOpen, Plus, Trash2, ChevronRight, Edit3,
-    HelpCircle, CheckCircle2, Save, X, FileText, Send, Star, ChevronDown, ChevronUp
+    BookOpen, Plus, Trash2, Edit3,
+    HelpCircle, CheckCircle2, Save, X, FileText, Send, Star, ChevronDown, ChevronUp, User, UserPlus, Download
 } from 'lucide-react';
 import { CurriculumTopic, InstrumentGroup, QuizQuestion, Teacher, Student } from '../../types';
 import { fetchCurriculumTopics, saveCurriculumTopic, getInstrumentGroup, applyTopicToStudent } from '../../services/curriculumService';
-import { Sparkles, User } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import jsPDF from 'jspdf';
 
 interface Props {
     currentUser: Teacher;
@@ -35,9 +35,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             const data = await fetchCurriculumTopics(activeGroup);
             setTopics(data || []);
         } catch (e: any) {
-            if (!e.message?.includes("not found")) {
-                console.error("Erro ao carregar matérias:", e);
-            }
+            console.error(e);
         } finally {
             setLoading(false);
         }
@@ -47,6 +45,61 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
         loadTopics();
     }, [activeGroup]);
 
+    const handleDownloadPDF = (topic: Partial<CurriculumTopic>) => {
+        try {
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            
+            // Header
+            doc.setFillColor(26, 17, 13); // Black
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("MUSICLASS", 20, 20);
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text("EDUCATIONAL SYSTEM", 20, 28);
+            
+            // Title
+            doc.setTextColor(232, 122, 44); // Orange
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text(activeGroup.replace('_', ' ').toUpperCase(), 20, 55);
+            
+            doc.setTextColor(60, 36, 21); // Dark Brown
+            doc.setFontSize(26);
+            doc.text(topic.title?.toUpperCase() || "MATÉRIA", 20, 65);
+            
+            // Divider
+            doc.setDrawColor(232, 122, 44);
+            doc.setLineWidth(1);
+            doc.line(20, 75, 190, 75);
+            
+            // Content
+            doc.setTextColor(60, 36, 21);
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            
+            const splitContent = doc.splitTextToSize(topic.content_text || "Sem conteúdo cadastrado.", 170);
+            doc.text(splitContent, 20, 85);
+            
+            // Footer
+            const pageHeight = doc.internal.pageSize.getHeight();
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text("Gerado automaticamente pelo MusiClass Manager", pageWidth / 2, pageHeight - 10, { align: "center" });
+            
+            doc.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
+            showToast("PDF Gerado!", "success");
+        } catch (e) {
+            console.error(e);
+            showToast("Erro ao gerar PDF.", "error");
+        }
+    };
+
     const handleSaveTopic = async () => {
         if (!editingTopic?.title || editingTopic.month_index === undefined) return;
         setLoading(true);
@@ -54,6 +107,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             await saveCurriculumTopic(editingTopic, activeGroup, currentUser.id);
             setEditingTopic(null);
             loadTopics();
+            showToast("Matéria salva!", "success");
         } catch (e: any) {
             showToast("Erro ao salvar: " + e.message, "error");
         } finally {
@@ -68,8 +122,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             if (error) throw error;
             loadTopics();
         } catch (e: any) {
-            console.error(e);
-            showToast("Erro ao excluir: " + (e.message || "Você não tem permissão ou o tópico está em uso."), "error");
+            showToast("Erro ao excluir.", "error");
         }
     };
 
@@ -97,10 +150,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             });
 
             if (editingTopic && parsedQuiz.length > 0) {
-                setEditingTopic({
-                    ...editingTopic,
-                    quiz_json: [...(editingTopic.quiz_json || []), ...parsedQuiz]
-                });
+                setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), ...parsedQuiz] });
                 setAiInput("");
                 setIsAiModuleOpen(false);
                 showToast(`${parsedQuiz.length} questões importadas!`, "success");
@@ -113,68 +163,48 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
         setIsGeneratingLink(true);
         try {
             const token = await applyTopicToStudent(selectedStudentId, editingTopic.id, currentUser.id);
-
             if (token) {
                 const link = `${window.location.origin}/?quiz=${token}`;
-                try {
-                    await navigator.clipboard.writeText(link);
-                    showToast("✨ Link copiado! Cole no WhatsApp do aluno.", "success");
-                } catch (clipErr) {
+                try { await navigator.clipboard.writeText(link); showToast("Link copiado!", "success"); }
+                catch (e) {
                     const textArea = document.createElement("textarea");
-                    textArea.value = link;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
+                    textArea.value = link; document.body.appendChild(textArea);
+                    textArea.select(); document.execCommand('copy');
                     document.body.removeChild(textArea);
-                    showToast("✨ Link gerado e copiado!", "success");
+                    showToast("Link gerado!", "success");
                 }
-            } else {
-                showToast("Erro ao gerar token do quiz.", "error");
             }
-        } catch (e: any) {
-            showToast("Erro: " + e.message, "error");
-        } finally {
-            setIsGeneratingLink(false);
-        }
+        } catch (e: any) { showToast("Erro: " + e.message, "error"); }
+        finally { setIsGeneratingLink(false); }
     };
 
     const eligibleStudents = students.filter(s => getInstrumentGroup(s.instrument) === activeGroup);
     const isEditable = editingTopic && (currentUser.role === 'director' || (editingTopic.month_index === 0 && editingTopic.creator_id === currentUser.id));
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
+        <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-fade-in pb-20 pt-2 lg:pt-0">
             {!forceGroup && (
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1">
                     <div>
-                        <h2 className="text-3xl md:text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
-                        <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">{currentUser.role === 'director' ? 'Gestão de Conteúdo' : 'Consulta Pedagógica'}</p>
+                        <h2 className="text-3xl md:text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
+                        <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">Biblioteca Pedagógica</p>
                     </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        <button
-                            onClick={() => {
-                                setEditingTopic({
-                                    title: '',
-                                    month_index: 0,
-                                    content_text: '',
-                                    quiz_json: [],
-                                    creator_id: currentUser.id
-                                } as any);
-                            }}
-                            className="flex-grow md:flex-grow-0 flex items-center justify-center gap-2 px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10"
-                        >
-                            <Plus className="w-4 h-4" /> Novo Questionário
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => setEditingTopic({ title: '', month_index: 0, content_text: '', quiz_json: [], creator_id: currentUser.id } as any)}
+                        className="w-full md:w-auto px-6 py-4 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10 flex items-center justify-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" /> Novo Tópico
+                    </button>
                 </header>
             )}
 
             {!forceGroup && (
-                <div className="flex flex-wrap gap-2 md:gap-4 p-2 bg-[#FBF6F0] rounded-[24px] md:rounded-[32px] w-fit">
+                <div className="flex flex-wrap gap-2 p-1 bg-[#FBF6F0] rounded-[24px] w-fit">
                     {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
                         <button
                             key={group}
                             onClick={() => setActiveGroup(group)}
-                            className={`px-4 md:px-8 py-3 md:py-4 rounded-2xl md:rounded-3xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/40 hover:text-[#3C2415]'}`}
+                            className={`px-5 py-3 rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/30 hover:text-[#3C2415]'}`}
                         >
                             {group.replace('_', ' ')}
                         </button>
@@ -182,52 +212,27 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {topics.filter(t => t.month_index > 0).map(topic => (
-                    <div key={topic.id} className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-2xl transition-all">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {topics.map(topic => (
+                    <div key={topic.id} className="bg-white rounded-[40px] md:rounded-[48px] p-8 md:p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-xl transition-all h-full flex flex-col">
                         <div className="flex justify-between items-start mb-6">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg bg-[#E87A2C] text-white">
-                                {topic.month_index}
+                            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black text-lg md:text-xl shadow-lg ${topic.month_index === 0 ? 'bg-stone-900 text-yellow-500' : 'bg-[#E87A2C] text-white'}`}>
+                                {topic.month_index === 0 ? <Star className="w-5 h-5 fill-current" /> : topic.month_index}
                             </div>
                             {(currentUser.role === 'director' || topic.creator_id === currentUser.id) && (
                                 <div className="flex gap-2">
-                                    <button onClick={() => setEditingTopic(topic)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-orange-50 text-stone-400 hover:text-[#E87A2C] transition-all"><Edit3 className="w-5 h-5" /></button>
-                                    <button onClick={() => deleteTopic(topic.id)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-rose-50 text-stone-300 hover:text-rose-500 transition-all"><Trash2 className="w-5 h-5" /></button>
+                                    <button onClick={() => setEditingTopic(topic)} className="p-2.5 bg-[#FBF6F0] rounded-xl hover:bg-orange-50 text-stone-400 hover:text-[#E87A2C] transition-all"><Edit3 className="w-5 h-5" /></button>
+                                    <button onClick={() => deleteTopic(topic.id)} className="p-2.5 bg-[#FBF6F0] rounded-xl hover:bg-rose-50 text-stone-300 hover:text-rose-500 transition-all"><Trash2 className="w-5 h-5" /></button>
                                 </div>
                             )}
                         </div>
-                        <h3 className="text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-4">{topic.title}</h3>
-                        <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">{(topic.quiz_json?.length || 0)} Questões de Quiz</p>
-                        <div className="flex flex-col gap-2">
-                            <button onClick={() => { setEditingTopic(topic); setIsContentExpanded(false); }} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
+                        <h3 className="text-xl md:text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-2 line-clamp-2 min-h-[3rem]">{topic.title}</h3>
+                        <p className="text-[10px] text-stone-300 font-bold uppercase tracking-widest mb-6">Módulo {activeGroup.split('_')[0]} • {topic.quiz_json?.length || 0} Questões</p>
+                        
+                        <div className="mt-auto flex flex-col gap-2">
+                            <button onClick={() => { setEditingTopic(topic); setIsContentExpanded(false); }} className="w-full py-4 bg-[#FBF6F0] hover:bg-[#1A110D] hover:text-white rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all">Ver Detalhes</button>
                             {onSelectTopic && (
-                                <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Aplicar na Aula</button>
-                            )}
-                        </div>
-                    </div>
-                ))}
-
-                {topics.filter(t => t.month_index === 0).map(topic => (
-                    <div key={topic.id} className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-2xl transition-all">
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg bg-stone-900 text-yellow-500">
-                                <Star className="w-6 h-6 fill-current" />
-                            </div>
-                            <div className="flex gap-2">
-                                {(currentUser.role === 'director' || topic.creator_id === currentUser.id) && (
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setEditingTopic(topic)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-orange-50 text-stone-400 hover:text-[#E87A2C] transition-all"><Edit3 className="w-5 h-5" /></button>
-                                        <button onClick={() => deleteTopic(topic.id)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-rose-50 text-stone-300 hover:text-rose-500 transition-all"><Trash2 className="w-5 h-5" /></button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <h3 className="text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-4">{topic.title}</h3>
-                        <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">{(topic.quiz_json?.length || 0)} Questões de Quiz</p>
-                        <div className="flex flex-col gap-2">
-                            <button onClick={() => { setEditingTopic(topic); setIsContentExpanded(false); }} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
-                            {onSelectTopic && (
-                                <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Aplicar na Aula</button>
+                                <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all">Aplicar na Aula</button>
                             )}
                         </div>
                     </div>
@@ -235,164 +240,118 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             </div>
 
             {editingTopic && (
-                <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[500] flex items-center justify-center p-2 md:p-4">
-                    <div className="bg-white rounded-[32px] md:rounded-[56px] w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
-                        <header className="p-5 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
-                            <div className="flex-1 pr-2">
-                                <h3 className="text-lg md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{isEditable ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
-                                <p className="text-[8px] md:text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-1 md:mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
+                <div className="fixed inset-0 bg-[#000000]/80 backdrop-blur-sm z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-t-[40px] md:rounded-[48px] w-full max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-500">
+                        <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase">{isEditable ? 'Editar' : 'Detalhes'}</h3>
+                                <p className="text-[9px] md:text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-1">{activeGroup.replace('_', ' ')} • Mes {editingTopic.month_index}</p>
                             </div>
-                            <button onClick={() => setEditingTopic(null)} className="p-3 md:p-4 bg-[#FBF6F0] rounded-xl md:rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
+                            <button onClick={() => setEditingTopic(null)} className="p-3 bg-[#FBF6F0] rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-6 h-6" /></button>
                         </header>
 
-                        <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar space-y-8">
-                            {!isEditable ? (
-                                <div className="space-y-6">
-                                    <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Conteúdo Pedagógico</h4>
-                                    <h2 className="text-2xl md:text-4xl font-black text-[#3C2415] uppercase tracking-tighter leading-tight">{editingTopic.title}</h2>
-                                    <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
-                                        <div className={`p-6 md:p-8 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-lg ${!isContentExpanded ? 'max-h-[150px] overflow-hidden relative' : ''}`}>
-                                            {editingTopic.content_text || 'Sem conteúdo cadastrado.'}
-                                            {!isContentExpanded && (
-                                                <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#FBF6F0] to-transparent" />
-                                            )}
+                        <div className="flex-grow overflow-y-auto custom-scrollbar">
+                            <div className="p-6 md:p-10 space-y-8 pb-32">
+                                {!isEditable ? (
+                                    <div className="space-y-6">
+                                        <h2 className="text-3xl md:text-5xl font-black text-[#3C2415] uppercase tracking-tighter leading-none">{editingTopic.title}</h2>
+                                        
+                                        <div className="flex gap-4">
+                                            <button onClick={() => handleDownloadPDF(editingTopic)} className="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all">
+                                                <Download className="w-4 h-4" /> Baixar Resumo PDF
+                                            </button>
                                         </div>
-                                        <button 
-                                            onClick={() => setIsContentExpanded(!isContentExpanded)}
-                                            className="w-full py-4 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-widest text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all"
-                                        >
-                                            {isContentExpanded ? <><ChevronUp className="w-3 h-3"/> Ocultar Texto</> : <><ChevronDown className="w-3 h-3"/> Expandir Conteúdo Completo</>}
-                                        </button>
+
+                                        <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
+                                            <div className={`p-6 md:p-10 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-xl ${!isContentExpanded ? 'max-h-[200px] overflow-hidden relative' : ''}`}>
+                                                {editingTopic.content_text || 'Sem conteúdo.'}
+                                                {!isContentExpanded && <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#FBF6F0] to-transparent" />}
+                                            </div>
+                                            <button onClick={() => setIsContentExpanded(!isContentExpanded)} className="w-full py-5 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-[0.2em] text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all">
+                                                {isContentExpanded ? <><ChevronUp className="w-4 h-4"/> Recolher</> : <><ChevronDown className="w-4 h-4"/> Expandir Leitura</>}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-4 gap-6">
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                         <div className="col-span-1">
                                             <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Mês</label>
                                             <input type="number" value={editingTopic.month_index || ''} onChange={e => setEditingTopic({ ...editingTopic, month_index: parseInt(e.target.value) })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold" />
                                         </div>
-                                        <div className="col-span-3">
-                                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Título da Matéria</label>
-                                            <input value={editingTopic.title || ''} onChange={e => setEditingTopic({ ...editingTopic, title: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold" />
+                                        <div className="md:col-span-3">
+                                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Título</label>
+                                            <input value={editingTopic.title || ''} onChange={e => setEditingTopic({ ...editingTopic, title: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold text-lg" />
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Conteúdo / Resumo</label>
-                                        <textarea rows={4} value={editingTopic.content_text || ''} onChange={e => setEditingTopic({ ...editingTopic, content_text: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-3xl p-6 font-bold text-sm" />
-                                    </div>
-                                </div>
-                            )}
-
-                            {editingTopic.id && (
-                                <div className="bg-[#E87A2C]/5 p-6 md:p-8 rounded-[40px] border border-[#E87A2C]/10 space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white rounded-2xl text-[#E87A2C] shadow-sm">
-                                            <User className="w-6 h-6" />
+                                        <div className="md:col-span-4">
+                                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Texto da Matéria</label>
+                                            <textarea rows={8} value={editingTopic.content_text || ''} onChange={e => setEditingTopic({ ...editingTopic, content_text: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-3xl p-6 font-bold text-base" />
                                         </div>
-                                        <div>
-                                            <h4 className="font-black text-[#3C2415] uppercase tracking-tighter text-sm md:text-base">Módulo: Aplicar para Aluno</h4>
-                                            <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest">Gere o link do questionário agora</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col gap-4">
-                                        <select
-                                            value={selectedStudentId}
-                                            onChange={(e) => setSelectedStudentId(e.target.value)}
-                                            className="w-full bg-white border-none rounded-2xl p-4 font-bold text-sm shadow-sm focus:ring-2 focus:ring-[#E87A2C]"
-                                        >
-                                            <option value="">Selecione o aluno...</option>
-                                            {eligibleStudents.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name} ({s.instrument})</option>
-                                            ))}
-                                        </select>
-
-                                        <button
-                                            onClick={handleGenerateQuizLink}
-                                            disabled={!selectedStudentId || isGeneratingLink}
-                                            className="w-full py-5 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-orange-500/20 hover:scale-[1.02] transition-all disabled:opacity-30 disabled:hover:scale-100 flex items-center justify-center gap-3"
-                                        >
-                                            {isGeneratingLink ? 'GERANDO...' : <><Send className="w-4 h-4" /> GERAR LINK E COPIAR</>}
-                                        </button>
-                                        
-                                        {eligibleStudents.length === 0 && (
-                                            <p className="text-[9px] text-[#E87A2C] font-black uppercase text-center tracking-widest">Nenhum aluno de {activeGroup.replace('_', ' ')} encontrado.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="text-xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><HelpCircle className="w-6 h-6 text-[#E87A2C]" /> Questionário</h4>
-                                    {isEditable && (
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setIsAiModuleOpen(!isAiModuleOpen)} className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2"><FileText className="w-3 h-3" /> Importar Texto</button>
-                                            <button onClick={() => setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), { question: '', options: ['', '', '', ''], correctIndex: 0 }] })} className="px-4 py-2 bg-[#E87A2C] text-white rounded-xl font-black text-[9px] uppercase tracking-widest">+ Add Pergunta</button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {isAiModuleOpen && (
-                                    <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 mb-8 animate-fade-in">
-                                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-4">Cole o texto do questionário abaixo</p>
-                                        <textarea value={aiInput} onChange={e => setAiInput(e.target.value)} rows={6} className="w-full bg-white border-none rounded-2xl p-4 text-xs font-bold mb-4" placeholder="1. Pergunta?&#10;A) Opção 1...&#10;✅ Resposta: B" />
-                                        <button onClick={handleManualImport} disabled={!aiInput} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest">Processar e Adicionar</button>
                                     </div>
                                 )}
 
-                                <div className="space-y-4">
-                                    {editingTopic.quiz_json?.map((q, qIdx) => (
-                                        <div key={qIdx} className="bg-[#FBF6F0] p-8 rounded-[32px] border border-[#3C2415]/5 space-y-4 relative">
-                                            {isEditable && (
-                                                <button onClick={() => setEditingTopic({ ...editingTopic, quiz_json: editingTopic.quiz_json?.filter((_, i) => i !== qIdx) })} className="absolute top-6 right-6 p-2 text-rose-300 hover:text-rose-500 transition-all"><X className="w-4 h-4" /></button>
-                                            )}
-                                            {isEditable ? (
-                                                <input value={q.question} onChange={e => {
-                                                    const newList = [...(editingTopic.quiz_json || [])];
-                                                    newList[qIdx].question = e.target.value;
-                                                    setEditingTopic({ ...editingTopic, quiz_json: newList });
-                                                }} placeholder="Texto da Pergunta" className="w-full bg-white border-none rounded-xl p-4 font-bold text-sm" />
-                                            ) : (
-                                                <h5 className="font-black text-[#3C2415] text-lg pr-10">{qIdx + 1}. {q.question}</h5>
-                                            )}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {q.options.map((opt, oIdx) => (
-                                                    <div key={oIdx} className={`flex items-center gap-3 p-3 rounded-xl border ${q.correctIndex === oIdx ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-[#3C2415]/5'}`}>
-                                                        {isEditable ? (
-                                                            <input type="radio" checked={q.correctIndex === oIdx} onChange={() => {
-                                                                const newList = [...(editingTopic.quiz_json || [])];
-                                                                newList[qIdx].correctIndex = oIdx;
-                                                                setEditingTopic({ ...editingTopic, quiz_json: newList });
-                                                            }} className="w-4 h-4 accent-[#E87A2C]" />
-                                                        ) : (
-                                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${q.correctIndex === oIdx ? 'bg-emerald-500 border-emerald-500' : 'border-stone-200'}`}>
-                                                                {q.correctIndex === oIdx && <CheckCircle2 className="w-2 h-2 text-white" />}
-                                                            </div>
-                                                        )}
-                                                        {isEditable ? (
-                                                            <input value={opt} onChange={e => {
-                                                                const newList = [...(editingTopic.quiz_json || [])];
-                                                                newList[qIdx].options[oIdx] = e.target.value;
-                                                                setEditingTopic({ ...editingTopic, quiz_json: newList });
-                                                            }} className="flex-grow border-none font-bold text-xs bg-transparent" placeholder={`Opção ${String.fromCharCode(65 + oIdx)}`} />
-                                                        ) : (
-                                                            <span className={`flex-grow font-bold text-xs ${q.correctIndex === oIdx ? 'text-emerald-700' : 'text-stone-500'}`}>{opt}</span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                {editingTopic.id && (
+                                    <div className="bg-[#E87A2C]/5 p-6 md:p-8 rounded-[40px] border border-[#E87A2C]/10 space-y-6">
+                                        <div className="flex flex-col gap-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-white rounded-2xl text-[#E87A2C] shadow-sm"><UserPlus className="w-6 h-6" /></div>
+                                                <div>
+                                                    <h4 className="font-black text-[#3C2415] uppercase tracking-tighter">Gerar Quiz Link</h4>
+                                                    <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest">Selecione o aluno abaixo</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col md:flex-row gap-4">
+                                                <select value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)} className="flex-grow bg-white border-none rounded-2xl p-4 font-bold text-sm shadow-sm">
+                                                    <option value="">Escolha o Aluno...</option>
+                                                    {eligibleStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                </select>
+                                                <button onClick={handleGenerateQuizLink} disabled={!selectedStudentId || isGeneratingLink} className="px-10 py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-30">
+                                                    {isGeneratingLink ? 'AGUARDE...' : 'GERAR E COPIAR'}
+                                                </button>
                                             </div>
                                         </div>
-                                    ))}
+                                    </div>
+                                )}
+
+                                <div className="space-y-8">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-xl md:text-2xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><HelpCircle className="w-6 h-6 text-[#E87A2C]" /> Quiz e Exercícios</h4>
+                                        {isEditable && <button onClick={() => setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), { question: '', options: ['', '', '', ''], correctIndex: 0 }] })} className="px-5 py-3 bg-[#1A110D] text-white rounded-xl font-black text-[9px] uppercase tracking-widest">+ Pergunta</button>}
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        {editingTopic.quiz_json?.map((q, qIdx) => (
+                                            <div key={qIdx} className="bg-[#FBF6F0]/50 p-6 md:p-8 rounded-[32px] border border-[#3C2415]/5 space-y-4">
+                                                {isEditable ? (
+                                                    <input value={q.question} onChange={e => {
+                                                        const newList = [...(editingTopic.quiz_json || [])];
+                                                        newList[qIdx].question = e.target.value; setEditingTopic({ ...editingTopic, quiz_json: newList });
+                                                    }} placeholder="Pergunta..." className="w-full bg-white border-none rounded-xl p-4 font-bold text-sm" />
+                                                ) : <h5 className="font-black text-[#3C2415] text-lg">{qIdx + 1}. {q.question}</h5>}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {q.options.map((opt, oIdx) => (
+                                                        <div key={oIdx} className={`flex items-center gap-3 p-4 rounded-xl border ${q.correctIndex === oIdx ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-[#3C2415]/5'}`}>
+                                                            {isEditable ? <input type="radio" checked={q.correctIndex === oIdx} onChange={() => {
+                                                                const newList = [...(editingTopic.quiz_json || [])];
+                                                                newList[qIdx].correctIndex = oIdx; setEditingTopic({ ...editingTopic, quiz_json: newList });
+                                                            }} className="accent-[#E87A2C]" /> : <div className={`w-3 h-3 rounded-full ${q.correctIndex === oIdx ? 'bg-emerald-500' : 'bg-stone-200'}`} />}
+                                                            {isEditable ? <input value={opt} onChange={e => {
+                                                                const newList = [...(editingTopic.quiz_json || [])];
+                                                                newList[qIdx].options[oIdx] = e.target.value; setEditingTopic({ ...editingTopic, quiz_json: newList });
+                                                            }} className="flex-grow bg-transparent text-xs font-bold border-none" /> : <span className="text-xs font-bold text-stone-600">{opt}</span>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {isEditable && (
-                            <footer className="p-10 border-t border-[#3C2415]/5 shrink-0 bg-[#FBF6F0]/30">
-                                <button onClick={handleSaveTopic} disabled={loading} className="w-full bg-[#1A110D] text-white py-6 rounded-3xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl flex items-center justify-center gap-3">
-                                    {loading ? 'SALVANDO...' : <><Save className="w-5 h-5" /> SALVAR ALTERAÇÕES</>}
+                            <footer className="p-6 md:p-10 border-t border-[#3C2415]/5 bg-[#FBF6F0]/50 shrink-0">
+                                <button onClick={handleSaveTopic} disabled={loading} className="w-full py-6 bg-[#1A110D] text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl">
+                                    {loading ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}
                                 </button>
                             </footer>
                         )}
