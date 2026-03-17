@@ -554,11 +554,13 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-x-hidden relative">
+    <div className="h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden relative">
       
-      {/* Top Mobile Bar */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] sticky top-0 border-b border-white/5">
-        <Logo light size="sm" />
+      {/* Top Mobile Bar (Fixed at top) */}
+      <div className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <Logo light size="sm" />
+        </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}
           className="p-2 bg-white/10 rounded-xl"
@@ -584,7 +586,10 @@ const App: React.FC = () => {
         </button>
 
         <div className="hidden md:block mb-12 z-10"><Logo light size="sm" /></div>
-        <div className="md:hidden mb-12"><Logo light size="md" /></div>
+        <div className="md:hidden mb-12 flex flex-col gap-2">
+          <Logo light size="sm" />
+          <div className="h-0.5 w-12 bg-orange-500/20" />
+        </div>
 
         <div className="flex flex-col gap-2 flex-grow w-full z-10">
           <MenuButton 
@@ -655,8 +660,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Main Content */}
-      <main className={`flex-grow md:ml-0 md:p-8 lg:p-12 pb-0 overflow-y-auto min-h-screen transition-all duration-300`}>
+      {/* Main Content Area (Scrollable independently) */}
+      <main className={`flex-grow md:ml-0 md:p-8 lg:p-12 pb-0 overflow-y-auto w-full transition-all duration-300 custom-scrollbar`}>
         {activeTab === 'students' && (
           <StudentsView
             teacherStudents={teacherStudents}

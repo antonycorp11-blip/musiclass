@@ -144,12 +144,12 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
             {!forceGroup && (
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
                     <div>
-                        <h2 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
-                        <p className="text-stone-400 font-bold text-xs uppercase tracking-widest mt-2">{currentUser.role === 'director' ? 'Gestão de Conteúdo' : 'Consulta Pedagógica'}</p>
+                        <h2 className="text-3xl md:text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
+                        <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">{currentUser.role === 'director' ? 'Gestão de Conteúdo' : 'Consulta Pedagógica'}</p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
                         <button
                             onClick={() => {
                                 setEditingTopic({
@@ -160,7 +160,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
                                     creator_id: currentUser.id
                                 } as any);
                             }}
-                            className="flex items-center gap-2 px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10"
+                            className="flex-grow md:flex-grow-0 flex items-center justify-center gap-2 px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10"
                         >
                             <Plus className="w-4 h-4" /> Novo Questionário
                         </button>
@@ -169,12 +169,12 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             )}
 
             {!forceGroup && (
-                <div className="flex flex-wrap gap-4 p-2 bg-[#FBF6F0] rounded-[32px] w-fit">
+                <div className="flex flex-wrap gap-2 md:gap-4 p-2 bg-[#FBF6F0] rounded-[24px] md:rounded-[32px] w-fit">
                     {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
                         <button
                             key={group}
                             onClick={() => setActiveGroup(group)}
-                            className={`px-8 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/40 hover:text-[#3C2415]'}`}
+                            className={`px-4 md:px-8 py-3 md:py-4 rounded-2xl md:rounded-3xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/40 hover:text-[#3C2415]'}`}
                         >
                             {group.replace('_', ' ')}
                         </button>
@@ -235,12 +235,12 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             </div>
 
             {editingTopic && (
-                <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[500] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[56px] w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
-                        <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
-                            <div className="flex-1 pr-4">
-                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{isEditable ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
-                                <p className="text-[9px] font-black text-[#E87A2C] uppercase tracking-widest mt-1 md:mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
+                <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[500] flex items-center justify-center p-2 md:p-4">
+                    <div className="bg-white rounded-[32px] md:rounded-[56px] w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+                        <header className="p-5 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
+                            <div className="flex-1 pr-2">
+                                <h3 className="text-lg md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{isEditable ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
+                                <p className="text-[8px] md:text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-1 md:mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
                             </div>
                             <button onClick={() => setEditingTopic(null)} className="p-3 md:p-4 bg-[#FBF6F0] rounded-xl md:rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
                         </header>
