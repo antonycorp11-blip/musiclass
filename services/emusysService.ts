@@ -2,7 +2,7 @@
 import { Instrument } from '../types';
 
 // O proxy no vite.config.ts redireciona /emusys-api para https://api.emusys.com.br
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://wayigtlilhvutbfvxgae.supabase.co';
 const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/emusys-proxy`;
 
 export interface EmusysStudent {
@@ -29,7 +29,7 @@ export const emusysService = {
             let nextCursor: string | null = null;
             let hasMore = true;
 
-            const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_YP9wwSLwb5yIl6mX9ebAmg_IB3xDd4L';
 
             while (hasMore) {
                 const path = `/aulas?data_hora_inicial=${encodeURIComponent(startDate)}&data_hora_final=${encodeURIComponent(endDate)}${nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : ''}`;
