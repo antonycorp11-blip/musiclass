@@ -10,13 +10,16 @@
   --soft-brown: #5C4033;
 }
 
-body {
-  background-color: var(--cream);
-  color: var(--black);
+html, body {
+  background-color: #1A110D;
+  color: #1A110D;
   font-family: 'Inter', sans-serif;
   margin: 0;
   padding: 0;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .safe-top {

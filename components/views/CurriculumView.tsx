@@ -45,69 +45,90 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
 
     const handleDownloadPDF = async (topic: Partial<CurriculumTopic>) => {
         try {
-            const { domToPng } = await import('modern-screenshot');
+            const html2canvas = (await import('html2canvas')).default;
             
             const container = document.createElement('div');
             container.style.position = 'fixed';
-            container.style.left = '-9999px';
-            container.style.width = '700px';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.width = '800px';
+            container.style.zIndex = '-1000';
+            container.style.opacity = '0';
             container.style.backgroundColor = '#FBF6F0';
             container.style.color = '#1A110D';
             container.style.fontFamily = "'Inter', sans-serif";
             
             container.innerHTML = `
-                <div style="background: #1A110D; padding: 60px 50px; border-bottom: 8px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background: #1A110D; padding: 60px 50px; border-bottom: 12px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; flex-direction: column;">
-                         <h1 style="color: white; font-weight: 950; font-size: 38px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
-                         <p style="color: #E87A2C; font-weight: 800; font-size: 11px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 4px;">Studio de Música & Arte</p>
+                         <h1 style="color: white; font-weight: 950; font-size: 42px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
+                         <p style="color: #E87A2C; font-weight: 800; font-size: 12px; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 5px;">Studio de Música & Arte</p>
                     </div>
-                    <img src="/Logo-Laranja.png" style="height: 70px;" />
+                    <img src="${window.location.origin}/Logo-Laranja.png" style="height: 80px;" id="pdf-logo" />
                 </div>
                 
-                <div style="padding: 50px;">
-                    <div style="margin-bottom: 50px;">
-                        <div style="display: inline-block; padding: 6px 16px; border: 3px solid #E87A2C; border-radius: 12px; font-weight: 900; font-size: 11px; text-transform: uppercase; color: #E87A2C;">
+                <div style="padding: 60px 80px;">
+                    <div style="margin-bottom: 60px;">
+                        <div style="display: inline-block; padding: 8px 20px; border: 4px solid #E87A2C; border-radius: 16px; font-weight: 900; font-size: 13px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
                             MODULO ${activeGroup.replace('_', ' ').toUpperCase()}
                         </div>
-                        <h2 style="font-size: 48px; font-weight: 950; color: #1A110D; margin: 25px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -3px;">${topic.title || 'Matéria'}</h2>
-                        <div style="margin-top: 20px; height: 5px; width: 100px; background: #E87A2C;"></div>
+                        <h2 style="font-size: 56px; font-weight: 950; color: #1A110D; margin: 30px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -3px;">${topic.title || 'Matéria'}</h2>
+                        <div style="margin-top: 25px; height: 8px; width: 120px; background: #E87A2C; border-radius: 4px;"></div>
                     </div>
                     
-                    <div style="font-size: 20px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; margin-bottom: 80px; font-weight: 600;">
+                    <div style="font-size: 22px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; margin-bottom: 100px; font-weight: 600;">
 ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     </div>
                     
-                    <div style="border-top: 2px solid #3C241533; padding-top: 40px; text-align: center;">
-                        <p style="font-size: 12px; font-weight: 800; color: #3C2415; opacity: 0.4; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
+                    <div style="border-top: 3px solid #E87A2C22; padding-top: 50px; text-align: center;">
+                        <p style="font-size: 14px; font-weight: 900; color: #1A110D; opacity: 0.5; text-transform: uppercase; letter-spacing: 3px;">Material Pedagógico Oficial • Studio MusiClass</p>
                     </div>
                 </div>
             `;
             
             document.body.appendChild(container);
             
-            const dataUrl = await domToPng(container, {
+            // Wait for logo
+            const logo = container.querySelector('#pdf-logo') as HTMLImageElement;
+            if (logo) {
+                await new Promise((resolve) => {
+                    if (logo.complete) resolve(true);
+                    logo.onload = () => resolve(true);
+                    logo.onerror = () => resolve(true);
+                    setTimeout(() => resolve(true), 1500); // Failsafe
+                });
+            }
+
+            // Small render delay
+            await new Promise(r => setTimeout(r, 500));
+            
+            const canvas = await html2canvas(container, {
                 scale: 2,
-                backgroundColor: '#FBF6F0'
+                backgroundColor: '#FBF6F0',
+                useCORS: true,
+                allowTaint: true
             });
             
             document.body.removeChild(container);
             
+            const dataUrl = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
+            
             const imgProps = pdf.getImageProperties(dataUrl);
             const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
             
             let heightLeft = imgHeight;
             let position = 0;
 
-            pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight);
+            pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
             heightLeft -= pageHeight;
 
             while (heightLeft >= 0) {
                 position = heightLeft - imgHeight;
                 pdf.addPage();
-                pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight);
+                pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
                 heightLeft -= pageHeight;
             }
             
@@ -172,9 +193,9 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
     return (
         <div className="max-w-6xl mx-auto animate-fade-in pb-20 pt-0">
             {!forceGroup && (
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1 mb-8">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1 mb-8 text-[#1A110D]">
                     <div>
-                        <h2 className="text-3xl md:text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
+                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">Grade Master</h2>
                         <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">Biblioteca Pedagógica</p>
                     </div>
                     <button
@@ -187,7 +208,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             )}
 
             {!forceGroup && (
-                <div className="flex flex-wrap gap-2 p-1 bg-[#FBF6F0] rounded-[24px] w-fit mb-8">
+                <div className="flex flex-wrap gap-2 p-1 bg-[#FBF6F0] rounded-[24px] w-fit mb-8 border border-[#3C2415]/5">
                     {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
                         <button
                             key={group}
@@ -229,20 +250,20 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
 
             {editingTopic && (
                 <div className="fixed inset-0 bg-[#000000]/80 backdrop-blur-sm z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-t-[40px] md:rounded-[48px] w-full max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-500">
+                    <div className="bg-[#FBF6F0] rounded-t-[40px] md:rounded-[48px] w-full max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-500 text-[#1A110D]">
                         <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
                             <div>
-                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase">{isEditable ? 'Editar' : 'Detalhes'}</h3>
+                                <h3 className="text-xl md:text-3xl font-black tracking-tighter uppercase">{isEditable ? 'Editar' : 'Detalhes'}</h3>
                                 <p className="text-[9px] md:text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-1">{activeGroup.replace('_', ' ')} • Mes {editingTopic.month_index}</p>
                             </div>
-                            <button onClick={() => setEditingTopic(null)} className="p-3 bg-[#FBF6F0] rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setEditingTopic(null)} className="p-3 bg-white rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all shadow-sm"><X className="w-6 h-6" /></button>
                         </header>
 
                         <div className="flex-grow overflow-y-auto custom-scrollbar">
                             <div className="p-6 md:p-10 space-y-8 pb-32">
                                 {!isEditable ? (
                                     <div className="space-y-6">
-                                        <h2 className="text-3xl md:text-5xl font-black text-[#3C2415] uppercase tracking-tighter leading-none">{editingTopic.title}</h2>
+                                        <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none">{editingTopic.title}</h2>
                                         
                                         <div className="flex gap-4">
                                             <button onClick={() => handleDownloadPDF(editingTopic)} className="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all">
@@ -250,12 +271,12 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                             </button>
                                         </div>
 
-                                        <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
+                                        <div className="bg-white rounded-[32px] overflow-hidden border border-[#3C2415]/5 shadow-sm">
                                             <div className={`p-6 md:p-10 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-xl ${!isContentExpanded ? 'max-h-[200px] overflow-hidden relative' : ''}`}>
                                                 {editingTopic.content_text || 'Sem conteúdo.'}
-                                                {!isContentExpanded && <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#FBF6F0] to-transparent" />}
+                                                {!isContentExpanded && <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent" />}
                                             </div>
-                                            <button onClick={() => setIsContentExpanded(!isContentExpanded)} className="w-full py-5 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-[0.2em] text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all">
+                                            <button onClick={() => setIsContentExpanded(!isContentExpanded)} className="w-full py-5 bg-stone-50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-[0.2em] text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all">
                                                 {isContentExpanded ? <><ChevronUp className="w-4 h-4"/> Recolher</> : <><ChevronDown className="w-4 h-4"/> Expandir Leitura</>}
                                             </button>
                                         </div>
@@ -264,15 +285,15 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                         <div className="col-span-1">
                                             <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Mês</label>
-                                            <input type="number" value={editingTopic.month_index || ''} onChange={e => setEditingTopic({ ...editingTopic, month_index: parseInt(e.target.value) })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold" />
+                                            <input type="number" value={editingTopic.month_index || ''} onChange={e => setEditingTopic({ ...editingTopic, month_index: parseInt(e.target.value) })} className="w-full bg-white border-none rounded-2xl p-4 font-bold shadow-sm" />
                                         </div>
                                         <div className="md:col-span-3">
                                             <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Título</label>
-                                            <input value={editingTopic.title || ''} onChange={e => setEditingTopic({ ...editingTopic, title: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold text-lg" />
+                                            <input value={editingTopic.title || ''} onChange={e => setEditingTopic({ ...editingTopic, title: e.target.value })} className="w-full bg-white border-none rounded-2xl p-4 font-bold text-lg shadow-sm" />
                                         </div>
                                         <div className="md:col-span-4">
                                             <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Texto da Matéria</label>
-                                            <textarea rows={8} value={editingTopic.content_text || ''} onChange={e => setEditingTopic({ ...editingTopic, content_text: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-3xl p-6 font-bold text-base" />
+                                            <textarea rows={8} value={editingTopic.content_text || ''} onChange={e => setEditingTopic({ ...editingTopic, content_text: e.target.value })} className="w-full bg-white border-none rounded-3xl p-6 font-bold text-base shadow-sm" />
                                         </div>
                                     </div>
                                 )}
@@ -283,7 +304,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                             <div className="flex items-center gap-4">
                                                 <div className="p-3 bg-white rounded-2xl text-[#E87A2C] shadow-sm"><UserPlus className="w-6 h-6" /></div>
                                                 <div>
-                                                    <h4 className="font-black text-[#3C2415] uppercase tracking-tighter">Gerar Quiz Link</h4>
+                                                    <h4 className="font-black uppercase tracking-tighter">Gerar Quiz Link</h4>
                                                     <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest">Selecione o aluno abaixo</p>
                                                 </div>
                                             </div>
@@ -292,7 +313,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                                     <option value="">Escolha o Aluno...</option>
                                                     {eligibleStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                                 </select>
-                                                <button onClick={handleGenerateQuizLink} disabled={!selectedStudentId || isGeneratingLink} className="px-10 py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-30">
+                                                <button onClick={handleGenerateQuizLink} disabled={!selectedStudentId || isGeneratingLink} className="px-10 py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-30 shadow-lg">
                                                     {isGeneratingLink ? 'AGUARDE...' : 'GERAR E COPIAR'}
                                                 </button>
                                             </div>
@@ -302,22 +323,22 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
 
                                 <div className="space-y-8">
                                     <div className="flex justify-between items-center">
-                                        <h4 className="text-xl md:text-2xl font-black text-[#3C2415] uppercase tracking-tighter flex items-center gap-3"><HelpCircle className="w-6 h-6 text-[#E87A2C]" /> Quiz e Exercícios</h4>
-                                        {isEditable && <button onClick={() => setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), { question: '', options: ['', '', '', ''], correctIndex: 0 }] })} className="px-5 py-3 bg-[#1A110D] text-white rounded-xl font-black text-[9px] uppercase tracking-widest">+ Pergunta</button>}
+                                        <h4 className="text-xl md:text-2xl font-black uppercase tracking-tighter flex items-center gap-3"><HelpCircle className="w-6 h-6 text-[#E87A2C]" /> Quiz e Exercícios</h4>
+                                        {isEditable && <button onClick={() => setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), { question: '', options: ['', '', '', ''], correctIndex: 0 }] })} className="px-5 py-3 bg-[#1A110D] text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md">+ Pergunta</button>}
                                     </div>
                                     
                                     <div className="space-y-4">
                                         {editingTopic.quiz_json?.map((q, qIdx) => (
-                                            <div key={qIdx} className="bg-[#FBF6F0]/50 p-6 md:p-8 rounded-[32px] border border-[#3C2415]/5 space-y-4">
+                                            <div key={qIdx} className="bg-white p-6 md:p-8 rounded-[32px] border border-[#3C2415]/5 space-y-4 shadow-sm">
                                                 {isEditable ? (
                                                     <input value={q.question} onChange={e => {
                                                         const newList = [...(editingTopic.quiz_json || [])];
                                                         newList[qIdx].question = e.target.value; setEditingTopic({ ...editingTopic, quiz_json: newList });
-                                                    }} placeholder="Pergunta..." className="w-full bg-white border-none rounded-xl p-4 font-bold text-sm" />
-                                                ) : <h5 className="font-black text-[#3C2415] text-lg">{qIdx + 1}. {q.question}</h5>}
+                                                    }} placeholder="Pergunta..." className="w-full bg-[#FBF6F0] border-none rounded-xl p-4 font-bold text-sm" />
+                                                ) : <h5 className="font-black text-lg">{qIdx + 1}. {q.question}</h5>}
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     {q.options.map((opt, oIdx) => (
-                                                        <div key={oIdx} className={`flex items-center gap-3 p-4 rounded-xl border ${q.correctIndex === oIdx ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-[#3C2415]/5'}`}>
+                                                        <div key={oIdx} className={`flex items-center gap-3 p-4 rounded-xl border ${q.correctIndex === oIdx ? 'bg-emerald-50 border-emerald-200' : 'bg-[#FBF6F0] border-[#3C2415]/5'}`}>
                                                             {isEditable ? <input type="radio" checked={q.correctIndex === oIdx} onChange={() => {
                                                                 const newList = [...(editingTopic.quiz_json || [])];
                                                                 newList[qIdx].correctIndex = oIdx; setEditingTopic({ ...editingTopic, quiz_json: newList });
@@ -337,7 +358,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                         </div>
 
                         {isEditable && (
-                            <footer className="p-6 md:p-10 border-t border-[#3C2415]/5 bg-[#FBF6F0]/50 shrink-0">
+                            <footer className="p-6 md:p-10 border-t border-[#3C2415]/5 bg-white shrink-0">
                                 <button onClick={handleSaveTopic} disabled={loading} className="w-full py-6 bg-[#1A110D] text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl">
                                     {loading ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}
                                 </button>

@@ -554,10 +554,10 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
+    <div className="fixed inset-0 bg-[#1A110D] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
       
       {/* Top Mobile Bar (Fixed at top) */}
-      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top">
+      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top w-full">
         <div className="flex items-center">
           <Logo light size="sm" />
         </div>
@@ -571,7 +571,7 @@ const App: React.FC = () => {
 
       {/* Modern Sidebar (Overlay on Mobile, Fixed on Desktop) */}
       <nav className={`
-        fixed inset-y-0 left-0 w-[280px] bg-[#1A110D] text-white z-[500] 
+        fixed inset-y-0 left-0 w-[240px] bg-[#1A110D] text-white z-[500] 
         transform transition-all duration-500 ease-in-out
         md:relative md:translate-x-0 md:w-20 lg:w-72
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -591,7 +591,7 @@ const App: React.FC = () => {
           <div className="h-0.5 w-12 bg-orange-500/20" />
         </div>
 
-        <div className="flex flex-col gap-2 flex-grow w-full z-10">
+        <div className="flex flex-col gap-2 flex-grow w-full z-10 overflow-y-auto custom-scrollbar pr-2">
           <MenuButton 
             active={activeTab === 'students'} 
             onClick={() => { setActiveTab('students'); setIsSidebarOpen(false); }} 
@@ -629,7 +629,7 @@ const App: React.FC = () => {
             label="Ranking" 
           />
 
-          <div className="my-4 border-t border-white/5" />
+          <div className="my-4 border-t border-white/5 shrink-0" />
 
           {currentUser.role === 'director' && (
             <MenuButton 
@@ -645,7 +645,7 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-auto pt-6 border-t border-white/5 w-full z-10">
+        <div className="mt-auto pt-6 border-t border-white/5 w-full z-10 shrink-0">
           <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
             <LogOut className="w-5 h-5" /><span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Sair do Sistema</span>
           </button>
@@ -661,8 +661,8 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content Area (Scrollable independently) */}
-      <main className="flex-grow flex flex-col h-full overflow-hidden relative">
-        <div className="flex-grow overflow-y-auto px-4 py-8 md:p-8 lg:p-12 custom-scrollbar">
+      <main className="flex-grow flex flex-col h-full overflow-hidden relative bg-[#FBF6F0] rounded-t-[32px] md:rounded-none">
+        <div className="flex-grow overflow-y-auto px-4 pt-2 pb-8 md:p-8 lg:p-12 custom-scrollbar">
         {activeTab === 'students' && (
           <StudentsView
             teacherStudents={teacherStudents}
