@@ -557,7 +557,7 @@ const App: React.FC = () => {
     <div className="fixed inset-0 bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
       
       {/* Top Mobile Bar (Fixed at top) */}
-      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top h-16">
+      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top">
         <div className="flex items-center">
           <Logo light size="sm" />
         </div>

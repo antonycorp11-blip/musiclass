@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     BookOpen, Plus, Trash2, Edit3,
-    HelpCircle, CheckCircle2, Save, X, FileText, Send, Star, ChevronDown, ChevronUp, User, UserPlus, Download
+    HelpCircle, Download, X, Star, ChevronDown, ChevronUp, UserPlus
 } from 'lucide-react';
-import { CurriculumTopic, InstrumentGroup, QuizQuestion, Teacher, Student } from '../../types';
+import { CurriculumTopic, InstrumentGroup, Teacher, Student } from '../../types';
 import { fetchCurriculumTopics, saveCurriculumTopic, getInstrumentGroup, applyTopicToStudent } from '../../services/curriculumService';
 import { useToast } from '../../context/ToastContext';
 import jsPDF from 'jspdf';
@@ -23,8 +23,6 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
     const [topics, setTopics] = useState<CurriculumTopic[]>([]);
     const [editingTopic, setEditingTopic] = useState<Partial<CurriculumTopic> | null>(null);
     const [loading, setLoading] = useState(false);
-    const [aiInput, setAiInput] = useState("");
-    const [isAiModuleOpen, setIsAiModuleOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string>("");
     const [isGeneratingLink, setIsGeneratingLink] = useState(false);
     const [isContentExpanded, setIsContentExpanded] = useState(false);
@@ -45,82 +43,77 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
         loadTopics();
     }, [activeGroup]);
 
-    const handleDownloadPDF = (topic: Partial<CurriculumTopic>) => {
+    const handleDownloadPDF = async (topic: Partial<CurriculumTopic>) => {
         try {
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 20;
-            const contentWidth = pageWidth - (margin * 2);
-            let cursorY = 85;
+            const { domToPng } = await import('modern-screenshot');
             
-            // Function to add header to any page
-            const addHeader = (pdfDoc: jsPDF) => {
-                pdfDoc.setFillColor(26, 17, 13); // Black
-                pdfDoc.rect(0, 0, pageWidth, 40, 'F');
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.width = '700px';
+            container.style.backgroundColor = '#FBF6F0';
+            container.style.color = '#1A110D';
+            container.style.fontFamily = "'Inter', sans-serif";
+            
+            container.innerHTML = `
+                <div style="background: #1A110D; padding: 60px 50px; border-bottom: 8px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; flex-direction: column;">
+                         <h1 style="color: white; font-weight: 950; font-size: 38px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
+                         <p style="color: #E87A2C; font-weight: 800; font-size: 11px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 4px;">Studio de Música & Arte</p>
+                    </div>
+                    <img src="/Logo-Laranja.png" style="height: 70px;" />
+                </div>
                 
-                pdfDoc.setTextColor(255, 255, 255);
-                pdfDoc.setFontSize(22);
-                pdfDoc.setFont("helvetica", "bold");
-                pdfDoc.text("MUSICLASS", margin, 20);
-                
-                pdfDoc.setFontSize(10);
-                pdfDoc.setFont("helvetica", "normal");
-                pdfDoc.text("EDUCATIONAL SYSTEM", margin, 28);
-                
-                // Title on first page only (if cursorY is initial)
-                if (cursorY === 85) {
-                    pdfDoc.setTextColor(232, 122, 44); // Orange
-                    pdfDoc.setFontSize(12);
-                    pdfDoc.setFont("helvetica", "bold");
-                    pdfDoc.text(activeGroup.replace('_', ' ').toUpperCase(), margin, 55);
+                <div style="padding: 50px;">
+                    <div style="margin-bottom: 50px;">
+                        <div style="display: inline-block; padding: 6px 16px; border: 3px solid #E87A2C; border-radius: 12px; font-weight: 900; font-size: 11px; text-transform: uppercase; color: #E87A2C;">
+                            MODULO ${activeGroup.replace('_', ' ').toUpperCase()}
+                        </div>
+                        <h2 style="font-size: 48px; font-weight: 950; color: #1A110D; margin: 25px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -3px;">${topic.title || 'Matéria'}</h2>
+                        <div style="margin-top: 20px; height: 5px; width: 100px; background: #E87A2C;"></div>
+                    </div>
                     
-                    pdfDoc.setTextColor(60, 36, 21); // Dark Brown
-                    pdfDoc.setFontSize(26);
-                    pdfDoc.text(topic.title?.toUpperCase() || "MATÉRIA", margin, 65);
+                    <div style="font-size: 20px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; margin-bottom: 80px; font-weight: 600;">
+${topic.content_text || 'Sem conteúdo cadastrado.'}
+                    </div>
                     
-                    // Divider
-                    pdfDoc.setDrawColor(232, 122, 44);
-                    pdfDoc.setLineWidth(1);
-                    pdfDoc.line(margin, 75, pageWidth - margin, 75);
-                }
-            };
-
-            const addFooter = (pdfDoc: jsPDF, pageNum: number) => {
-                pdfDoc.setFontSize(8);
-                pdfDoc.setTextColor(150, 150, 150);
-                pdfDoc.text(`Página ${pageNum} - Gerado pelo MusiClass Manager`, pageWidth / 2, pageHeight - 10, { align: "center" });
-            };
-
-            addHeader(doc);
+                    <div style="border-top: 2px solid #3C241533; padding-top: 40px; text-align: center;">
+                        <p style="font-size: 12px; font-weight: 800; color: #3C2415; opacity: 0.4; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
+                    </div>
+                </div>
+            `;
             
-            // Content
-            doc.setTextColor(60, 36, 21);
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "normal");
+            document.body.appendChild(container);
             
-            const splitContent = doc.splitTextToSize(topic.content_text || "Sem conteúdo cadastrado.", contentWidth);
-            
-            let currentPage = 1;
-            splitContent.forEach((line: string) => {
-                if (cursorY > pageHeight - 25) {
-                    addFooter(doc, currentPage);
-                    doc.addPage();
-                    currentPage++;
-                    cursorY = 55; // Start lower on new pages to leave room for header
-                    addHeader(doc);
-                    doc.setTextColor(60, 36, 21);
-                    doc.setFontSize(11);
-                    doc.setFont("helvetica", "normal");
-                }
-                doc.text(line, margin, cursorY);
-                cursorY += 7; // Line height
+            const dataUrl = await domToPng(container, {
+                scale: 2,
+                backgroundColor: '#FBF6F0'
             });
             
-            addFooter(doc, currentPage);
+            document.body.removeChild(container);
             
-            doc.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgProps = pdf.getImageProperties(dataUrl);
+            const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+            
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+            
+            pdf.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
             showToast("PDF Gerado!", "success");
+            
         } catch (e) {
             console.error(e);
             showToast("Erro ao gerar PDF.", "error");
@@ -153,38 +146,6 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
         }
     };
 
-    const handleManualImport = () => {
-        if (!aiInput.trim()) return;
-        try {
-            const questionsRaw = aiInput.split(/\d+\.\s+/).filter(q => q.trim().length > 10);
-            const parsedQuiz: QuizQuestion[] = questionsRaw.map(raw => {
-                const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                const question = lines[0];
-                const options: string[] = [];
-                ['A)', 'B)', 'C)', 'D)'].forEach(prefix => {
-                    const optLine = lines.find(l => l.startsWith(prefix));
-                    if (optLine) options.push(optLine.replace(prefix, '').trim());
-                });
-                const answerLine = lines.find(l => l.includes('✅') || l.toLowerCase().includes('resposta:'));
-                let correctIndex = 0;
-                if (answerLine) {
-                    if (answerLine.includes('A')) correctIndex = 0;
-                    else if (answerLine.includes('B')) correctIndex = 1;
-                    else if (answerLine.includes('C')) correctIndex = 2;
-                    else if (answerLine.includes('D')) correctIndex = 3;
-                }
-                return { question, options, correctIndex } as QuizQuestion;
-            });
-
-            if (editingTopic && parsedQuiz.length > 0) {
-                setEditingTopic({ ...editingTopic, quiz_json: [...(editingTopic.quiz_json || []), ...parsedQuiz] });
-                setAiInput("");
-                setIsAiModuleOpen(false);
-                showToast(`${parsedQuiz.length} questões importadas!`, "success");
-            }
-        } catch (e: any) { showToast("Erro: " + e.message, "error"); }
-    };
-
     const handleGenerateQuizLink = async () => {
         if (!selectedStudentId || !editingTopic?.id) return;
         setIsGeneratingLink(true);
@@ -209,9 +170,9 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
     const isEditable = editingTopic && (currentUser.role === 'director' || (editingTopic.month_index === 0 && editingTopic.creator_id === currentUser.id));
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-fade-in pb-20 pt-2 lg:pt-0">
+        <div className="max-w-6xl mx-auto animate-fade-in pb-20 pt-0">
             {!forceGroup && (
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1">
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1 mb-8">
                     <div>
                         <h2 className="text-3xl md:text-5xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
                         <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">Biblioteca Pedagógica</p>
@@ -226,7 +187,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             )}
 
             {!forceGroup && (
-                <div className="flex flex-wrap gap-2 p-1 bg-[#FBF6F0] rounded-[24px] w-fit">
+                <div className="flex flex-wrap gap-2 p-1 bg-[#FBF6F0] rounded-[24px] w-fit mb-8">
                     {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
                         <button
                             key={group}
