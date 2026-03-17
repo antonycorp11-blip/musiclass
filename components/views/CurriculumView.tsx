@@ -13,12 +13,13 @@ import { useToast } from '../../context/ToastContext';
 interface Props {
     currentUser: Teacher;
     students: Student[];
+    forceGroup?: InstrumentGroup;
     onSelectTopic?: (topic: CurriculumTopic) => void;
 }
 
-export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelectTopic }) => {
+export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGroup, onSelectTopic }) => {
     const { showToast } = useToast();
-    const [activeGroup, setActiveGroup] = useState<InstrumentGroup>('harmono_melodico');
+    const [activeGroup, setActiveGroup] = useState<InstrumentGroup>(forceGroup || 'harmono_melodico');
     const [topics, setTopics] = useState<CurriculumTopic[]>([]);
     const [editingTopic, setEditingTopic] = useState<Partial<CurriculumTopic> | null>(null);
     const [loading, setLoading] = useState(false);
@@ -119,7 +120,6 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                     await navigator.clipboard.writeText(link);
                     showToast("✨ Link copiado! Cole no WhatsApp do aluno.", "success");
                 } catch (clipErr) {
-                    // Fallback para quando o navegador bloqueia clipboard (comum em Iframe ou mobile sem HTTPS)
                     const textArea = document.createElement("textarea");
                     textArea.value = link;
                     document.body.appendChild(textArea);
@@ -132,11 +132,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                 showToast("Erro ao gerar token do quiz.", "error");
             }
         } catch (e: any) {
-            if (e.message?.includes("mc_student_topics")) {
-                console.warn("Funcionalidade de link limitada por falta de tabela.");
-            } else {
-                showToast("Erro: " + e.message, "error");
-            }
+            showToast("Erro: " + e.message, "error");
         } finally {
             setIsGeneratingLink(false);
         }
@@ -147,50 +143,46 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                    <h2 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
-                    <p className="text-stone-400 font-bold text-xs uppercase tracking-widest mt-2">{currentUser.role === 'director' ? 'Gestão de Conteúdo' : 'Consulta Pedagógica'}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => {
-                            setEditingTopic({
-                                title: '',
-                                month_index: 0,
-                                content_text: '',
-                                quiz_json: [],
-                                creator_id: currentUser.id
-                            } as any);
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10"
-                    >
-                        <Plus className="w-4 h-4" /> Novo Questionário
-                    </button>
-                </div>
-            </header>
+            {!forceGroup && (
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                        <h2 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">Grade Master</h2>
+                        <p className="text-stone-400 font-bold text-xs uppercase tracking-widest mt-2">{currentUser.role === 'director' ? 'Gestão de Conteúdo' : 'Consulta Pedagógica'}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => {
+                                setEditingTopic({
+                                    title: '',
+                                    month_index: 0,
+                                    content_text: '',
+                                    quiz_json: [],
+                                    creator_id: currentUser.id
+                                } as any);
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-[#1A110D] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/10"
+                        >
+                            <Plus className="w-4 h-4" /> Novo Questionário
+                        </button>
+                    </div>
+                </header>
+            )}
 
-            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-6 px-2">
-                As matérias mensais (Mês 1, 2...) são a base principal. Questionários (Mês 0) são extras personalizados.
-            </p>
-
-            <div className="flex gap-4 p-2 bg-[#FBF6F0] rounded-[32px] w-fit">
-                {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
-                    <button
-                        key={group}
-                        onClick={() => setActiveGroup(group)}
-                        className={`px-8 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/40 hover:text-[#3C2415]'}`}
-                    >
-                        {group.replace('_', ' ')}
-                    </button>
-                ))}
-            </div>
+            {!forceGroup && (
+                <div className="flex flex-wrap gap-4 p-2 bg-[#FBF6F0] rounded-[32px] w-fit">
+                    {(['harmono_melodico', 'percussao', 'vocal'] as InstrumentGroup[]).map(group => (
+                        <button
+                            key={group}
+                            onClick={() => setActiveGroup(group)}
+                            className={`px-8 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest transition-all ${activeGroup === group ? 'bg-[#1A110D] text-white shadow-xl' : 'text-[#3C2415]/40 hover:text-[#3C2415]'}`}
+                        >
+                            {group.replace('_', ' ')}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* MATÉRIAS MESTRAS */}
-                <div className="col-span-full mb-4 border-b border-[#3C2415]/5 pb-4">
-                    <h3 className="text-xs font-black text-[#E87A2C] uppercase tracking-[0.3em]">Grade Mestre MusiClass</h3>
-                </div>
                 {topics.filter(t => t.month_index > 0).map(topic => (
                     <div key={topic.id} className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-2xl transition-all">
                         <div className="flex justify-between items-start mb-6">
@@ -207,7 +199,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                         <h3 className="text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-4">{topic.title}</h3>
                         <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">{(topic.quiz_json?.length || 0)} Questões de Quiz</p>
                         <div className="flex flex-col gap-2">
-                            <button onClick={() => setEditingTopic(topic)} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
+                            <button onClick={() => { setEditingTopic(topic); setIsContentExpanded(false); }} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
                             {onSelectTopic && (
                                 <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Aplicar na Aula</button>
                             )}
@@ -215,40 +207,31 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                     </div>
                 ))}
 
-                {/* CONTEÚDO PERSONALIZADO */}
-                {topics.some(t => t.month_index === 0) && (
-                    <>
-                        <div className="col-span-full mt-12 mb-4 border-b border-[#3C2415]/5 pb-4">
-                            <h3 className="text-xs font-black text-stone-800 uppercase tracking-[0.3em]">Questionários & Personalizados</h3>
-                        </div>
-                        {topics.filter(t => t.month_index === 0).map(topic => (
-                            <div key={topic.id} className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-2xl transition-all">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg bg-stone-900 text-yellow-500">
-                                        <Star className="w-6 h-6 fill-current" />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <span className="px-3 py-1 bg-stone-100 text-stone-500 rounded-full text-[7px] font-black uppercase tracking-widest self-center">Personalizado</span>
-                                        {(currentUser.role === 'director' || topic.creator_id === currentUser.id) && (
-                                            <div className="flex gap-2">
-                                                <button onClick={() => setEditingTopic(topic)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-orange-50 text-stone-400 hover:text-[#E87A2C] transition-all"><Edit3 className="w-5 h-5" /></button>
-                                                <button onClick={() => deleteTopic(topic.id)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-rose-50 text-stone-300 hover:text-rose-500 transition-all"><Trash2 className="w-5 h-5" /></button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <h3 className="text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-4">{topic.title}</h3>
-                                <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">{(topic.quiz_json?.length || 0)} Questões de Quiz</p>
-                                <div className="flex flex-col gap-2">
-                                    <button onClick={() => setEditingTopic(topic)} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
-                                    {onSelectTopic && (
-                                        <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Aplicar na Aula</button>
-                                    )}
-                                </div>
+                {topics.filter(t => t.month_index === 0).map(topic => (
+                    <div key={topic.id} className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm group hover:shadow-2xl transition-all">
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-lg bg-stone-900 text-yellow-500">
+                                <Star className="w-6 h-6 fill-current" />
                             </div>
-                        ))}
-                    </>
-                )}
+                            <div className="flex gap-2">
+                                {(currentUser.role === 'director' || topic.creator_id === currentUser.id) && (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setEditingTopic(topic)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-orange-50 text-stone-400 hover:text-[#E87A2C] transition-all"><Edit3 className="w-5 h-5" /></button>
+                                        <button onClick={() => deleteTopic(topic.id)} className="p-3 bg-[#FBF6F0] rounded-xl hover:bg-rose-50 text-stone-300 hover:text-rose-500 transition-all"><Trash2 className="w-5 h-5" /></button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <h3 className="text-2xl font-black text-[#3C2415] uppercase tracking-tighter mb-4">{topic.title}</h3>
+                        <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">{(topic.quiz_json?.length || 0)} Questões de Quiz</p>
+                        <div className="flex flex-col gap-2">
+                            <button onClick={() => { setEditingTopic(topic); setIsContentExpanded(false); }} className="w-full py-4 bg-[#FBF6F0] group-hover:bg-[#1A110D] group-hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Ver Detalhes</button>
+                            {onSelectTopic && (
+                                <button onClick={() => onSelectTopic(topic)} className="w-full py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Aplicar na Aula</button>
+                            )}
+                        </div>
+                    </div>
+                ))}
             </div>
 
             {editingTopic && (
@@ -256,35 +239,34 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                     <div className="bg-white rounded-[56px] w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
                         <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
                             <div className="flex-1 pr-4">
-                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{currentUser.role === 'director' ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
+                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{isEditable ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
                                 <p className="text-[9px] font-black text-[#E87A2C] uppercase tracking-widest mt-1 md:mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
                             </div>
                             <button onClick={() => setEditingTopic(null)} className="p-3 md:p-4 bg-[#FBF6F0] rounded-xl md:rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
                         </header>
 
-                        <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar space-y-6 md:space-y-8">
-                            {(!isEditable) ? (
-                                <>
-                                    <div className="space-y-2">
-                                        <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Conteúdo Pedagógico</h4>
-                                        <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
-                                            <div className={`p-6 md:p-8 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-lg ${!isContentExpanded ? 'max-h-[150px] overflow-hidden relative' : ''}`}>
-                                                {editingTopic.content_text || 'Sem conteúdo cadastrado.'}
-                                                {!isContentExpanded && (
-                                                    <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#FBF6F0] to-transparent" />
-                                                )}
-                                            </div>
-                                            <button 
-                                                onClick={() => setIsContentExpanded(!isContentExpanded)}
-                                                className="w-full py-4 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-widest text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all"
-                                            >
-                                                {isContentExpanded ? <><ChevronUp className="w-3 h-3"/> Ocultar Texto</> : <><ChevronDown className="w-3 h-3"/> Expandir Conteúdo Completo</>}
-                                            </button>
+                        <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar space-y-8">
+                            {!isEditable ? (
+                                <div className="space-y-6">
+                                    <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Conteúdo Pedagógico</h4>
+                                    <h2 className="text-2xl md:text-4xl font-black text-[#3C2415] uppercase tracking-tighter leading-tight">{editingTopic.title}</h2>
+                                    <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
+                                        <div className={`p-6 md:p-8 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-lg ${!isContentExpanded ? 'max-h-[150px] overflow-hidden relative' : ''}`}>
+                                            {editingTopic.content_text || 'Sem conteúdo cadastrado.'}
+                                            {!isContentExpanded && (
+                                                <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#FBF6F0] to-transparent" />
+                                            )}
                                         </div>
+                                        <button 
+                                            onClick={() => setIsContentExpanded(!isContentExpanded)}
+                                            className="w-full py-4 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-widest text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all"
+                                        >
+                                            {isContentExpanded ? <><ChevronUp className="w-3 h-3"/> Ocultar Texto</> : <><ChevronDown className="w-3 h-3"/> Expandir Conteúdo Completo</>}
+                                        </button>
                                     </div>
-                                </>
+                                </div>
                             ) : (
-                                <>
+                                <div className="space-y-6">
                                     <div className="grid grid-cols-4 gap-6">
                                         <div className="col-span-1">
                                             <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Mês</label>
@@ -295,15 +277,13 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                                             <input value={editingTopic.title || ''} onChange={e => setEditingTopic({ ...editingTopic, title: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-2xl p-4 font-bold" />
                                         </div>
                                     </div>
-
                                     <div>
                                         <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest mb-2 block">Conteúdo / Resumo</label>
                                         <textarea rows={4} value={editingTopic.content_text || ''} onChange={e => setEditingTopic({ ...editingTopic, content_text: e.target.value })} className="w-full bg-[#FBF6F0] border-none rounded-3xl p-6 font-bold text-sm" />
                                     </div>
-                                </>
+                                </div>
                             )}
 
-                            {/* SEÇÃO DE AÇÃO PARA PROFESSORES */}
                             {editingTopic.id && (
                                 <div className="bg-[#E87A2C]/5 p-6 md:p-8 rounded-[40px] border border-[#E87A2C]/10 space-y-6">
                                     <div className="flex items-center gap-4">
@@ -333,15 +313,13 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                                             disabled={!selectedStudentId || isGeneratingLink}
                                             className="w-full py-5 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-orange-500/20 hover:scale-[1.02] transition-all disabled:opacity-30 disabled:hover:scale-100 flex items-center justify-center gap-3"
                                         >
-                                            {isGeneratingLink ? 'GERANDO...' : <><Send className="w-4 h-4" /> GERAR LINK E COPIAR LINK</>}
+                                            {isGeneratingLink ? 'GERANDO...' : <><Send className="w-4 h-4" /> GERAR LINK E COPIAR</>}
                                         </button>
+                                        
+                                        {eligibleStudents.length === 0 && (
+                                            <p className="text-[9px] text-[#E87A2C] font-black uppercase text-center tracking-widest">Nenhum aluno de {activeGroup.replace('_', ' ')} encontrado.</p>
+                                        )}
                                     </div>
-                                </div>
-                            )}
-
-                                    {eligibleStudents.length === 0 && (
-                                        <p className="text-[9px] text-[#E87A2C] font-black uppercase text-center tracking-widest">Nenhum aluno de {activeGroup.replace('_', ' ')} encontrado.</p>
-                                    )}
                                 </div>
                             )}
 
@@ -364,7 +342,6 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                                     </div>
                                 )}
 
-                                <div className="space-y-4">
                                 <div className="space-y-4">
                                     {editingTopic.quiz_json?.map((q, qIdx) => (
                                         <div key={qIdx} className="bg-[#FBF6F0] p-8 rounded-[32px] border border-[#3C2415]/5 space-y-4 relative">
@@ -408,7 +385,6 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                                             </div>
                                         </div>
                                     ))}
-                                </div>
                                 </div>
                             </div>
                         </div>
