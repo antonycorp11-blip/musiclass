@@ -8,7 +8,10 @@ import {
   Wrench,
   LayoutDashboard,
   Layout,
-  X
+  ScrollText,
+  X,
+  AlertCircle,
+  Trophy
 } from 'lucide-react';
 
 import { Instrument, Level, Student, Teacher, LessonTemplate } from './types';
@@ -21,7 +24,9 @@ import { ManualChordEditor } from './components/ManualChordEditor';
 
 // Custom Hooks
 import { useStudents } from './hooks/useStudents';
-import { useLesson } from './hooks/useLesson';
+import { useAuth } from './context/AuthContext';
+import { useLessonContext } from './context/LessonContext';
+import { useToast } from './context/ToastContext';
 
 // Views
 import { StudentsView } from './components/views/StudentsView';
@@ -29,34 +34,49 @@ import { LessonEditorView } from './components/views/LessonEditorView';
 import { HistoryView } from './components/views/HistoryView';
 import { AdminDashboardView } from './components/views/AdminDashboardView';
 import { LessonTemplatesView } from './components/views/LessonTemplatesView';
+import { CurriculumView } from './components/views/CurriculumView';
+import { QuizPlayer } from './components/QuizPlayer';
+import { fetchCurriculumTopics, applyTopicToStudent } from './services/curriculumService';
+import { RankingView } from './components/views/RankingView';
+import { CurriculumTopic, StudentTopicProgress } from './types';
+import { StudentCenterView } from './components/views/StudentCenterView';
+
+// Modals
+import { AddStudentModal } from './components/modals/AddStudentModal';
+import { AddTeacherModal } from './components/modals/AddTeacherModal';
+import { SyncResultsModal } from './components/modals/SyncResultsModal';
+import { InstallPrompt } from './components/modals/InstallPrompt';
+import { ConfirmationOverlay } from './components/modals/ConfirmationOverlay';
+import { CurriculumLibraryModal } from './components/modals/CurriculumLibraryModal';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<Teacher | null>(null);
-  const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox'>('students');
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [isAddingStudent, setIsAddingStudent] = useState(false);
-  const [isAddingTeacher, setIsAddingTeacher] = useState(false);
+    const { currentUser, logout, login: handleLogin } = useAuth();
+    const { showToast } = useToast();
+    const {
+        selectedStudent, setSelectedStudent,
+        currentChords, setCurrentChords, currentScales, setCurrentScales, currentTabs, setCurrentTabs, currentSolos, setCurrentSolos,
+        exercises, setExercises, currentObjective, setCurrentObjective, drumsData, setDrumsData, recordings, setRecordings,
+        isRecording, newExercise, setNewExercise,
+        resetLesson, addChord, saveManualChord,
+        addScale, addTab, addSolo, updateTab, updateSolo, removeTab,
+        addExercise, removeExercise,
+        startRecording, stopRecording, handleDrumRecord,
+        exportSuccess
+    } = useLessonContext();
 
-  // Custom Hooks
-  const {
-    students, teachers, lessonHistory, loading,
-    fetchInitialData, addStudent: doAddStudent, deleteLesson,
-    resetData, addTeacher, deleteTeacher,
-    emusysSync, fileUpload
-  } = useStudents(currentUser);
+    const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox' | 'curriculum' | 'student-center' | 'ranking'>('students');
+    const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [isAddingTeacher, setIsAddingTeacher] = useState(false);
 
-  const {
-    currentChords, setCurrentChords, currentScales, setCurrentScales, currentTabs, setCurrentTabs, currentSolos, setCurrentSolos,
-    exercises, setExercises, currentObjective, setCurrentObjective, drumsData, setDrumsData, recordings, setRecordings,
-    isRecording, newExercise, setNewExercise,
-    resetLesson, addChord, saveManualChord,
-    addScale, addTab, addSolo, updateTab, updateSolo, removeTab,
-    addExercise, removeExercise,
-    startRecording, stopRecording, handleDrumRecord,
-    exportSuccess
-  } = useLesson(selectedStudent, currentUser);
+    // Custom Hooks
+    const {
+        students, teachers, lessonHistory, loading,
+        fetchInitialData, addStudent: doAddStudent, deleteLesson,
+        resetData, resetQuizzes, addTeacher, deleteTeacher,
+        emusysSync, fileUpload
+    } = useStudents(currentUser);
 
-  // Selection UI State
+    // Selection UI State
   const [showAdvancedChord, setShowAdvancedChord] = useState(false);
   const [selRoot, setSelRoot] = useState('C');
   const [selType, setSelType] = useState('maj');
@@ -68,9 +88,187 @@ const App: React.FC = () => {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [quizToken, setQuizToken] = useState<string | null>(null);
+  const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
+  const [schoolConfig, setSchoolConfig] = useState<any>({
+    headerPaddingH: 48,
+    headerPaddingV: 32,
+    logoHeight: 48,
+    studentFontSize: 24,
+    teacherFontSize: 14,
+    logoOffset: 0,
+    studentOffset: 0,
+    teacherOffset: 0,
+    spacing: 24,
+    dividerColor: '#E87A2C66',
+    showMusiClass: true
+  });
 
-  // Galeria de Aulas State
+  const fetchSchoolConfig = async () => {
+    try {
+      const { data, error } = await supabase.from('mc_school_config').select('config').limit(1).single();
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data?.config) setSchoolConfig(data.config);
+    } catch (e) {
+      console.warn("Using default school config", e);
+    }
+  };
+
+  const updateSchoolConfig = async (newConfig: any) => {
+    setSchoolConfig(newConfig);
+    try {
+      const { data: existing } = await supabase.from('mc_school_config').select('id').limit(1).single();
+      if (existing) {
+        await supabase.from('mc_school_config').update({ config: newConfig }).eq('id', existing.id);
+      } else {
+        await supabase.from('mc_school_config').insert({ config: newConfig });
+      }
+    } catch (e) {
+      console.error("Error saving school config:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) fetchSchoolConfig();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'teacher') {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'mc_lesson_history',
+            filter: `teacher_id=eq.${currentUser.id}`
+          },
+          (payload) => {
+            const oldRead = payload.old.read_count || 0;
+            const newRead = payload.new.read_count || 0;
+
+            if (newRead > oldRead || (payload.new.is_read && !payload.old.is_read)) {
+              // Sound notification if possible
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+              audio.play().catch(() => { });
+
+              // Browser notification
+              if (Notification.permission === 'granted') {
+                const s = students.find(std => std.id === payload.new.student_id);
+                const sName = s ? s.name : 'Um aluno';
+                new Notification('Confirmação MusiClass!', {
+                  body: `${sName} confirmou o treino agora!`,
+                  icon: '/favicon.ico',
+                  requireInteraction: true
+                });
+              }
+              fetchInitialData();
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [currentUser]);
+
+  const [confirmationScreen, setConfirmationScreen] = useState<{ student: string, inst: string, session: string } | null>(null);
+
+  useEffect(() => {
+    const handleConfirmation = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('quiz');
+      if (token) setQuizToken(token);
+
+      const confirmReadId = params.get('confirm_read');
+      if (!confirmReadId) return;
+
+      console.log('Detectada solicitação de confirmação:', confirmReadId);
+
+      const session = params.get('session') || '1';
+      const sName = params.get('s_name') || 'Estudante';
+      const inst = params.get('inst') || 'Instrumento';
+
+      try {
+        const { data, error: fetchError } = await supabase.from('mc_lesson_history')
+          .select('read_count, interaction_log')
+          .eq('id', confirmReadId)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        const newCount = (data?.read_count || 0) + 1;
+        const oldLog = Array.isArray(data?.interaction_log) ? data.interaction_log : [];
+        const newLog = [...oldLog, {
+          session,
+          at: new Date().toISOString(),
+          student: sName,
+          instrument: inst
+        }];
+
+        const { error: updateError } = await supabase.from('mc_lesson_history')
+          .update({
+            is_read: true,
+            read_at: new Date().toISOString(),
+            read_count: newCount,
+            interaction_log: newLog
+          })
+          .eq('id', confirmReadId);
+
+        if (updateError) throw updateError;
+
+        console.log('Confirmação salva com sucesso!');
+        setConfirmationScreen({ student: sName, inst, session });
+        window.history.replaceState({}, document.title, "/");
+      } catch (err) {
+        console.error("Erro no fluxo de confirmação:", err);
+        showToast("Erro ao confirmar leitura. Por favor, avise seu professor.", "error");
+      }
+    };
+
+    handleConfirmation();
+  }, []);
+
+  // Dados Globais de Currículo para Alertas
+  const [allTopics, setAllTopics] = useState<CurriculumTopic[]>([]);
+  const [allProgress, setAllProgress] = useState<StudentTopicProgress[]>([]);
+
+  const fetchGlobalCurriculum = async () => {
+    try {
+      const groups = ['harmono_melodico', 'percussao', 'vocal'] as const;
+      const topicsPromises = groups.map(g => fetchCurriculumTopics(g));
+      const results = await Promise.all(topicsPromises);
+      const flatTopics = results.flat();
+      setAllTopics(flatTopics);
+
+      try {
+        const { data: progressData } = await supabase.from('mc_student_topics').select('*');
+        if (progressData) {
+          setAllProgress(progressData.map(p => ({
+            ...p,
+            topic: flatTopics.find(t => t.id === p.topic_id)
+          })));
+        }
+      } catch (e) {
+        console.warn("Tabela mc_student_topics ausente.");
+      }
+    } catch (e) { console.error("Erro ao buscar currículo global:", e); }
+  };
+
+  useEffect(() => {
+    if (currentUser) fetchGlobalCurriculum();
+  }, [currentUser]);
+
+  // Galeria e Biblioteca State
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [isCurriculumLibraryOpen, setIsCurriculumLibraryOpen] = useState(false);
   const [templates, setTemplates] = useState<LessonTemplate[]>([]);
 
   const fetchTemplates = async () => {
@@ -108,9 +306,9 @@ const App: React.FC = () => {
       is_public: false
     });
 
-    if (error) alert("Erro ao salvar modelo: " + error.message);
+    if (error) showToast("Erro ao salvar modelo: " + error.message, "error");
     else {
-      alert("Aula salva na sua galeria!");
+      showToast("Aula salva na sua galeria!", "success");
       fetchTemplates();
     }
   };
@@ -127,7 +325,7 @@ const App: React.FC = () => {
     setSelectedStudent(student);
     setActiveTab('lesson');
     setIsGalleryOpen(false);
-    alert(`Modelo "${template.title}" aplicado a ${student.name}!`);
+    showToast(`Modelo "${template.title}" aplicado a ${student.name}!`, "success");
   };
 
   const handleSaveTemplateFromHistory = async (h: any) => {
@@ -144,9 +342,9 @@ const App: React.FC = () => {
       is_public: false
     });
 
-    if (error) alert("Erro ao salvar modelo: " + error.message);
+    if (error) showToast("Erro ao salvar modelo: " + error.message, "error");
     else {
-      alert("Aula do histórico salva na sua galeria!");
+      showToast("Aula do histórico salva na sua galeria!", "success");
       fetchTemplates();
     }
   };
@@ -154,15 +352,18 @@ const App: React.FC = () => {
   const handleDeleteTemplate = async (id: string) => {
     if (window.confirm("Deseja excluir este modelo permanentemente?")) {
       const { error } = await supabase.from('mc_lesson_templates').delete().eq('id', id);
-      if (error) alert(error.message);
+      if (error) showToast(error.message, "error");
       else fetchTemplates();
     }
   };
 
   const handleTogglePublic = async (id: string, isPublic: boolean) => {
     const { error } = await supabase.from('mc_lesson_templates').update({ is_public: isPublic }).eq('id', id);
-    if (error) alert(error.message);
-    else fetchTemplates();
+    if (error) showToast(error.message, "error");
+    else {
+        showToast(isPublic ? "Template agora é público." : "Template agora é privado.", "info");
+        fetchTemplates();
+    }
   };
 
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,90 +391,76 @@ const App: React.FC = () => {
         url: publicUrl
       }]);
 
-      alert("Áudio enviado com sucesso!");
+      showToast("Áudio enviado com sucesso!", "success");
     } catch (e: any) {
-      alert("Erro no upload: " + e.message);
+      showToast("Erro no upload: " + e.message, "error");
     }
   };
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('music_current_user');
-    if (savedUser && savedUser !== 'undefined') {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error("Failed to parse saved user", e);
-        localStorage.removeItem('music_current_user');
-      }
-    }
+    useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+            if (!isInstalled) setShowInstallPrompt(true);
+        });
+    }, []);
 
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
-      if (!isInstalled) setShowInstallPrompt(true);
-    });
-  }, []);
+    const handleInstallApp = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') console.log('User accepted');
+        setDeferredPrompt(null);
+        setShowInstallPrompt(false);
+    };
 
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') console.log('User accepted');
-    setDeferredPrompt(null);
-    setShowInstallPrompt(false);
-  };
+    const handleLogout = () => {
+        logout();
+        setSelectedStudent(null);
+    };
 
-  const handleLogin = (user: Teacher) => {
-    setCurrentUser(user);
-    localStorage.setItem('music_current_user', JSON.stringify(user));
-  };
+    const handleResetData = async () => {
+        if (window.confirm("ATENÇÃO: Isso apagará TODOS os alunos do sistema permanentemente. Deseja continuar?")) {
+            await resetData();
+            setSelectedStudent(null);
+            showToast("Banco de dados resetado!", "info");
+        }
+    };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('music_current_user');
-    setSelectedStudent(null);
-  };
+    const handleAddTeacher = async (name: string, pass: string) => {
+        try {
+            await addTeacher(name, pass);
+            showToast(`${name} cadastrado com sucesso!`, "success");
+            setIsAddingTeacher(false);
+            return true;
+        } catch (e: any) {
+            showToast(e.message || "Erro ao salvar professor", "error");
+            return false;
+        }
+    };
 
-  const handleResetData = async () => {
-    if (window.confirm("ATENÇÃO: Isso apagará TODOS os alunos do sistema permanentemente. Deseja continuar?")) {
-      await resetData();
-      setSelectedStudent(null);
-      alert("Banco de dados resetado!");
-    }
-  };
+    const handleDeleteTeacher = async (id: string) => {
+        if (window.confirm("Deseja realmente remover este professor?")) {
+            try {
+                await deleteTeacher(id);
+                showToast("Professor removido.", "info");
+            } catch (e: any) {
+                showToast(e.message, "error");
+            }
+        }
+    };
 
-  const handleAddTeacher = async (name: string, pass: string) => {
-    try {
-      await addTeacher(name, pass);
-      alert(`${name} cadastrado com sucesso!`);
-      setIsAddingTeacher(false);
-      return true;
-    } catch (e: any) {
-      alert(e.message || "Erro ao salvar professor");
-      return false;
-    }
-  };
-
-  const handleDeleteTeacher = async (id: string) => {
-    if (window.confirm("Deseja realmente remover este professor?")) {
-      try {
-        await deleteTeacher(id);
-      } catch (e: any) {
-        alert(e.message);
-      }
-    }
-  };
-
-  const addStudent = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      await doAddStudent(new FormData(e.currentTarget));
-      setIsAddingStudent(false);
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
+    const addStudent = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        try {
+            await doAddStudent(new FormData(e.currentTarget));
+            setIsAddingStudent(false);
+            showToast("Aluno cadastrado!", "success");
+        } catch (e: any) {
+            showToast(e.message, "error");
+        }
+    };
 
   const handleDeleteLesson = async (lessonId: string) => {
     if (window.confirm("Deseja realmente excluir esta aula?")) {
@@ -283,40 +470,42 @@ const App: React.FC = () => {
 
   const [syncResults, setSyncResults] = useState<{ added: number, updated: number, removed: number, logs: string[], missingTeachers: string[] } | null>(null);
 
-  const handleEmusysSync = async () => {
-    try {
-      const stats = await emusysSync();
-      if (stats) {
-        setSyncResults(stats);
-      }
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
+    const handleEmusysSync = async () => {
+        try {
+            const stats = await emusysSync();
+            if (stats) {
+                setSyncResults(stats);
+                showToast("Sincronização concluída!", "success");
+            }
+        } catch (e: any) {
+            showToast(e.message, "error");
+        }
+    };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const stats: any = await fileUpload(file);
-      if (stats.added > 0) {
-        let msg = `${stats.added} alunos importados!`;
-        if (stats.missingTeachers.length > 0) msg += `\n\nDocentes não reconhecidos: ${stats.missingTeachers.join(', ')}`;
-        alert(msg);
-      } else {
-        alert("Nenhum novo aluno na planilha.");
-      }
-    } catch (e) {
-      alert("Erro ao ler Excel.");
-    }
-  };
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const stats: any = await fileUpload(file);
+            if (stats.added > 0) {
+                let msg = `${stats.added} alunos importados!`;
+                if (stats.missingTeachers.length > 0) msg += `\n\nDocentes não reconhecidos: ${stats.missingTeachers.join(', ')}`;
+                showToast(msg, "info");
+            } else {
+                showToast("Nenhum novo aluno na planilha.", "info");
+            }
+        } catch (e) {
+            showToast("Erro ao ler Excel.", "error");
+        }
+    };
 
   const handleSelectStudent = (student: Student) => {
     if (selectedStudent?.id !== student.id) {
       resetLesson();
+      setCurrentLessonId(null);
     }
     setSelectedStudent(student);
-    setActiveTab('lesson');
+    setActiveTab('student-center');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -325,10 +514,11 @@ const App: React.FC = () => {
     setIsPreviewing(true);
   };
 
-  const handleExportSuccess = async (): Promise<any[]> => {
-    const recs = await exportSuccess();
+  const handleExportSuccess = async (): Promise<{ recordings: any[], lessonId?: string }> => {
+    const result = await exportSuccess();
+    if (result.lessonId) setCurrentLessonId(result.lessonId);
     await fetchInitialData();
-    return recs;
+    return result;
   };
 
   const teacherStudents = students.filter(s => s.teacher_id === currentUser?.id || currentUser?.role === 'director');
@@ -346,6 +536,15 @@ const App: React.FC = () => {
   }
 
   if (!currentUser) return <Login teachers={teachers} onLogin={handleLogin} />;
+
+  if (quizToken) {
+    return (
+      <QuizPlayer
+        token={quizToken}
+        onClose={() => setQuizToken(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-x-hidden">
@@ -369,11 +568,19 @@ const App: React.FC = () => {
           <button onClick={() => setIsGalleryOpen(true)} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all text-stone-500 hover:text-white hover:bg-white/5`}>
             <Layout className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Galeria</span>
           </button>
+          <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'curriculum' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
+            <ScrollText className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Grade Master</span>
+          </button>
           {currentUser.role === 'director' && (
-            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-              <LayoutDashboard className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Painel</span>
-            </button>
+            <>
+              <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
+                <LayoutDashboard className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Painel</span>
+              </button>
+            </>
           )}
+          <button onClick={() => setActiveTab('ranking')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'ranking' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
+            <Trophy className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Ranking</span>
+          </button>
           <button onClick={handleLogout} className="md:hidden flex flex-col items-center gap-1 px-3 py-2 text-stone-500"><LogOut className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-widest">Sair</span></button>
         </div>
         <div className="hidden md:block mt-auto pt-6 border-t border-white/5 w-full z-10">
@@ -392,6 +599,36 @@ const App: React.FC = () => {
             onFileUpload={handleFileUpload}
             onEmusysSync={handleEmusysSync}
             onAddStudentClick={() => setIsAddingStudent(true)}
+            allTopics={allTopics}
+            allProgress={allProgress}
+          />
+        )}
+
+        {activeTab === 'student-center' && selectedStudent && currentUser && (
+          <StudentCenterView
+            student={selectedStudent}
+            teacher={currentUser}
+            onStartLesson={() => setActiveTab('lesson')}
+            onViewHistory={(h) => {
+              setCurrentChords(h.report_data.chords || []);
+              setCurrentScales(h.report_data.scales || []);
+              setCurrentSolos(h.report_data.solos || []);
+              setCurrentTabs(h.report_data.tabs || []);
+              setExercises(h.report_data.exercises || []);
+              setCurrentObjective(h.objective || '');
+              setRecordings(h.report_data.recordings || []);
+              setDrumsData(h.report_data.drums || { rhythms: [], rudiments: [], positions: undefined });
+              setCurrentLessonId(h.id);
+              setActiveTab('lesson');
+            }}
+            onDeleteLesson={async (id) => {
+                if (confirm("Deseja realmente excluir esta ficha?")) {
+                    await deleteLesson(id);
+                    showToast("Ficha excluída com sucesso.", "success");
+                }
+            }}
+            allTopics={allTopics}
+            allProgress={allProgress}
           />
         )}
 
@@ -424,6 +661,7 @@ const App: React.FC = () => {
             selBass={selBass} setSelBass={setSelBass}
             onSaveTemplate={handleSaveTemplate}
             onToggleGallery={() => setIsGalleryOpen(true)}
+            onToggleCurriculum={() => setIsCurriculumLibraryOpen(true)}
             onAudioUpload={handleAudioUpload}
           />
         )}
@@ -455,6 +693,32 @@ const App: React.FC = () => {
             teachers={teachers} students={students}
             onAddTeacher={() => setIsAddingTeacher(true)}
             onDeleteTeacher={handleDeleteTeacher} onResetData={handleResetData}
+            schoolConfig={schoolConfig}
+            onUpdateConfig={updateSchoolConfig}
+            onResetQuizzes={resetQuizzes}
+          />
+        )}
+
+        {activeTab === 'curriculum' && (
+          <CurriculumView currentUser={currentUser} students={students} />
+        )}
+
+        {activeTab === 'ranking' && (
+          <RankingView
+            teachers={teachers}
+            students={students}
+            lessonHistory={lessonHistory}
+          />
+        )}
+
+        {isCurriculumLibraryOpen && selectedStudent && currentUser && (
+          <CurriculumLibraryModal
+            currentUser={currentUser}
+            selectedStudent={selectedStudent}
+            students={students}
+            currentObjective={currentObjective}
+            setCurrentObjective={setCurrentObjective}
+            onClose={() => setIsCurriculumLibraryOpen(false)}
           />
         )}
 
@@ -462,6 +726,18 @@ const App: React.FC = () => {
       </main>
 
       {/* Modals & Overlays */}
+      {confirmationScreen && (
+        <ConfirmationOverlay
+          student={confirmationScreen.student}
+          inst={confirmationScreen.inst}
+          session={confirmationScreen.session}
+          onClose={() => {
+            setConfirmationScreen(null);
+            fetchInitialData();
+          }}
+        />
+      )}
+
       {isPreviewing && selectedStudent && (
         <StudentPreview
           studentName={selectedStudent.name} teacherName={currentUser?.name || ''}
@@ -469,8 +745,10 @@ const App: React.FC = () => {
           chords={currentChords} scales={currentScales} exercises={exercises}
           tabs={currentTabs} solos={currentSolos} recordings={recordings}
           drums={drumsData} onClose={() => setIsPreviewing(false)} onExport={handleExportSuccess}
+          lessonId={currentLessonId || undefined}
           lessonCount={selectedStudent?.lesson_count}
           contractTotal={selectedStudent?.contract_total}
+          designSettings={schoolConfig}
         />
       )}
 
@@ -495,110 +773,30 @@ const App: React.FC = () => {
       )}
 
       {isAddingStudent && (
-        <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[100] p-6">
-          <div className="bg-white rounded-[64px] p-12 w-full max-w-xl shadow-2xl animate-fade-in">
-            <h3 className="text-4xl font-black text-[#3C2415] tracking-tighter uppercase mb-6">Novo Aluno</h3>
-            <form onSubmit={addStudent} className="space-y-6">
-              <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Nome Completo" />
-              <div className="grid grid-cols-2 gap-6">
-                <input name="age" type="number" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]" placeholder="Idade" />
-                <select name="level" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Level).map(l => <option key={l} value={l}>{l}</option>)}</select>
-              </div>
-              <select name="instrument" className="w-full bg-[#FBF6F0] border-none rounded-[32px] px-8 py-5 font-bold text-[#3C2415]">{Object.values(Instrument).map(i => <option key={i} value={i}>{i}</option>)}</select>
-              <button type="submit" className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-lg shadow-xl hover:bg-[#3C2415] transition-all">SALVAR ALUNO</button>
-              <button type="button" onClick={() => setIsAddingStudent(false)} className="w-full text-[#3C2415]/30 font-bold uppercase text-[10px] tracking-widest mt-4">Dispensar</button>
-            </form>
-          </div>
-        </div>
+        <AddStudentModal
+          onClose={() => setIsAddingStudent(false)}
+          onSubmit={addStudent}
+        />
       )}
 
       {isAddingTeacher && (
-        <div className="fixed inset-0 bg-[#3C2415]/40 backdrop-blur-xl flex items-center justify-center z-[200] p-6">
-          <div className="bg-white rounded-[64px] p-12 w-full max-w-lg shadow-2xl animate-fade-in">
-            <h3 className="text-3xl font-black text-[#3C2415] tracking-tighter uppercase mb-2">Novo Professor</h3>
-            <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-8 tracking-widest">Crie uma conta de acesso para um colega</p>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleAddTeacher(formData.get('name') as string, formData.get('pass') as string);
-            }} className="space-y-6">
-              <input name="name" required className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Nome do Professor" />
-              <input name="pass" required maxLength={4} className="w-full bg-[#FBF6F0] border-none rounded-3xl px-8 py-5 font-bold" placeholder="Senha (4 números)" />
-              <button type="submit" className="w-full bg-[#E87A2C] text-white py-5 rounded-3xl font-black text-lg shadow-xl">CADASTRAR</button>
-              <button type="button" onClick={() => setIsAddingTeacher(false)} className="w-full text-stone-400 font-bold text-xs uppercase py-2">Cancelar</button>
-            </form>
-          </div>
-        </div>
+        <AddTeacherModal
+          onClose={() => setIsAddingTeacher(false)}
+          onSubmit={handleAddTeacher}
+        />
       )}
 
       {showInstallPrompt && (
-        <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[200] flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-[48px] p-10 w-full max-w-md shadow-2xl animate-in fade-in slide-in-from-bottom-10 border border-[#3C2415]/5">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 bg-[#E87A2C] rounded-[32px] flex items-center justify-center mb-6 shadow-xl shadow-orange-500/20"><img src="/assets/icon-512.png" alt="MusiClass Icon" className="w-16 h-16 rounded-xl" /></div>
-              <h3 className="text-3xl font-black text-[#1A110D] tracking-tighter uppercase mb-4">MusiClass no seu Tablet</h3>
-              <p className="text-sm font-bold text-stone-500 uppercase tracking-widest leading-relaxed mb-8">Instale agora para acessar suas aulas direto da tela inicial, com desempenho superior.</p>
-              <div className="flex flex-col w-full gap-3">
-                <button onClick={handleInstallApp} className="w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-[#3C2415] transition-all">Instalar Aplicativo</button>
-                <button onClick={() => setShowInstallPrompt(false)} className="w-full py-4 text-stone-300 font-bold text-[10px] uppercase tracking-widest hover:text-[#E87A2C]">Agora não</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <InstallPrompt
+          onInstall={handleInstallApp}
+          onClose={() => setShowInstallPrompt(false)}
+        />
       )}
       {syncResults && (
-        <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[300] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[48px] p-10 w-full max-w-2xl shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-3xl font-black text-[#1A110D] tracking-tighter uppercase">Resultado da Sincronização</h3>
-                <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-1">Logs de atividades coletados do Emusys</p>
-              </div>
-              <button onClick={() => setSyncResults(null)} className="p-3 bg-[#FBF6F0] rounded-2xl hover:bg-stone-100 transition-all"><X className="w-6 h-6 text-stone-400" /></button>
-            </div>
-
-            <div className="flex gap-4 mb-8">
-              <div className="flex-1 bg-emerald-50 p-4 rounded-3xl border border-emerald-100">
-                <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Novos</p>
-                <p className="text-2xl font-black text-emerald-700">{syncResults.added}</p>
-              </div>
-              <div className="flex-1 bg-blue-50 p-4 rounded-3xl border border-blue-100">
-                <p className="text-[10px] font-black text-blue-600 uppercase mb-1">Trocas</p>
-                <p className="text-2xl font-black text-blue-700">{syncResults.updated}</p>
-              </div>
-              <div className="flex-1 bg-rose-50 p-4 rounded-3xl border border-rose-100">
-                <p className="text-[10px] font-black text-rose-600 uppercase mb-1">Saídas</p>
-                <p className="text-2xl font-black text-rose-700">{syncResults.removed}</p>
-              </div>
-            </div>
-
-            <div className="flex-grow overflow-y-auto space-y-2 pr-4 custom-scrollbar">
-              {syncResults.logs.length > 0 ? (
-                syncResults.logs.map((log, i) => (
-                  <div key={i} className="p-4 bg-[#FBF6F0] rounded-2xl text-[11px] font-bold text-[#3C2415]/70 border border-[#3C2415]/5">
-                    {log}
-                  </div>
-                ))
-              ) : (
-                <div className="py-12 text-center opacity-30 font-black uppercase text-xs tracking-widest">Nenhuma alteração detectada</div>
-              )}
-            </div>
-
-            {syncResults.missingTeachers.length > 0 && (
-              <div className="mt-8 p-6 bg-orange-50 rounded-[32px] border border-orange-100">
-                <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3 flex items-center gap-2">⚠️ Professores não cadastrados no MusiClass:</h4>
-                <div className="flex flex-wrap gap-2">
-                  {syncResults.missingTeachers.map((t, i) => (
-                    <span key={i} className="px-3 py-1 bg-white text-orange-700 text-[10px] font-black rounded-lg border border-orange-200">{t}</span>
-                  ))}
-                </div>
-                <p className="text-[9px] font-bold text-orange-600/60 mt-3 italic">* Cadastre estes nomes no painel para que os alunos sejam vinculados automaticamente.</p>
-              </div>
-            )}
-
-            <button onClick={() => setSyncResults(null)} className="mt-8 w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-[#3C2415] transition-all">CONCLUÍDO</button>
-          </div>
-        </div>
+        <SyncResultsModal
+          syncResults={syncResults}
+          onClose={() => setSyncResults(null)}
+        />
       )}
     </div>
   );

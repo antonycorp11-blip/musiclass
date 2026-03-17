@@ -68,12 +68,16 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
   return (
     <div className={`flex flex-col bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xl group transition-all duration-300 w-full ${isFullscreen ? 'max-w-[450px]' : 'max-w-[280px] mx-auto'}`}>
       <div className="bg-[#1A110D] py-4 px-5 flex justify-between items-center border-b-2 border-[#E87A2C]/30">
-        <h5 className="text-2xl font-black text-[#E87A2C] uppercase tracking-tighter leading-none">{fullChordName}</h5>
-        <div className="flex gap-1.5 shrink-0">
+        <div className="h-8">
+          <svg viewBox="0 0 120 32" className="h-full">
+            <text x="0" y="54%" dominantBaseline="middle" fill="#E87A2C" fontWeight="900" fontSize="24" style={{ letterSpacing: '-0.05em' }}>{fullChordName.toUpperCase()}</text>
+          </svg>
+        </div>
+        <div className="flex gap-2 shrink-0">
           {chordNotes.map((n, i) => (
-            <span key={i} className="inline-flex items-center justify-center px-2 py-1 text-[9px] font-black text-white uppercase bg-white/10 rounded-lg leading-none border border-white/5">
-              {n}
-            </span>
+            <div key={i} className="h-7 min-w-[36px] px-2 bg-white/20 rounded-xl border border-white/10 flex items-center justify-center shadow-lg">
+              <span className="text-[12px] font-black text-white uppercase tracking-tighter leading-none">{n}</span>
+            </div>
           ))}
         </div>
       </div>
@@ -83,8 +87,11 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
         <div className={`relative ${isFullscreen ? 'w-72 h-[400px]' : 'w-32 h-48'} bg-white border-x-[4px] border-b-[4px] border-[#3C2415] rounded-b-xl shadow-2xl mt-1 relative z-10`}>
           {/* Top Nut or Fret Label */}
           {startFret > 1 ? (
-            <div className="absolute -left-12 top-0 text-[#1A110D] font-black text-[9px] bg-white px-2 py-1 rounded-lg border-2 border-stone-200 shadow-sm z-50">
-              {startFret}ª casa
+            <div className="absolute -left-12 top-0 w-12 h-6 z-50">
+              <svg viewBox="0 0 50 24" className="w-full h-full">
+                <rect x="0" y="0" width="50" height="24" rx="6" fill="white" stroke="#E5E7EB" strokeWidth="1" />
+                <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle" fill="#1A110D" fontWeight="900" fontSize="10">{startFret}ª casa</text>
+              </svg>
             </div>
           ) : (
             <div className="absolute top-0 w-full h-4 bg-[#1A110D] -mt-2 rounded-t-sm z-40 shadow-md border-b border-[#E87A2C]/20" />
@@ -127,15 +134,19 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
           {shape.frets.map((fret: any, stringIndex: number) => {
             if (fret === null) {
               return (
-                <div key={stringIndex} className="absolute -top-9 text-rose-500 font-black text-lg drop-shadow-sm" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%`, transform: 'translateX(-50%)' }}>
-                  &times;
+                <div key={stringIndex} className="absolute -top-10 w-8 h-8 z-50 transform -translate-x-1/2" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%` }}>
+                  <svg viewBox="0 0 24 24" className="w-full h-full drop-shadow-sm">
+                    <path d="M7 7L17 17M7 17L17 7" stroke="#F43F5E" strokeWidth="3.5" strokeLinecap="round" />
+                  </svg>
                 </div>
               );
             }
             if (fret === 0) {
               return (
-                <div key={stringIndex} className="absolute -top-9 text-emerald-500 font-black text-lg drop-shadow-sm" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%`, transform: 'translateX(-50%)' }}>
-                  &#9675;
+                <div key={stringIndex} className="absolute -top-10 w-8 h-8 z-50 transform -translate-x-1/2" style={{ left: `${stringIndex * (100 / (numStrings - 1))}%` }}>
+                  <svg viewBox="0 0 24 24" className="w-full h-full drop-shadow-sm">
+                    <circle cx="12" cy="12" r="7" fill="none" stroke="#10B981" strokeWidth="2.5" />
+                  </svg>
                 </div>
               );
             }
@@ -146,14 +157,16 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
             return (
               <div
                 key={stringIndex}
-                className={`absolute ${isFullscreen ? 'w-10 h-10 text-xs' : 'w-7 h-7 text-[10px]'} bg-[#1A110D] rounded-full border-2 border-white shadow-[0_5px_15px_rgba(0,0,0,0.3)] flex items-center justify-center text-white font-black z-30 transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform`}
+                className={`absolute ${isFullscreen ? 'w-10 h-10' : 'w-7 h-7'} bg-[#1A110D] rounded-full border-2 border-white shadow-[0_5px_15px_rgba(0,0,0,0.3)] z-30 transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform`}
                 style={{
                   top: `${(relativeFret / numFretsToShow) * 100 - (100 / numFretsToShow / 2)}%`,
                   left: `${stringIndex * (100 / (numStrings - 1))}%`
                 }}
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#E87A2C]/20 to-transparent rounded-full" />
-                {finger || ''}
+                <svg viewBox="0 0 40 40" className="w-full h-full relative z-10">
+                  <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle" fill="white" fontWeight="900" fontSize={isFullscreen ? "14" : "18"}>{finger || ''}</text>
+                </svg>
               </div>
             );
           })}
@@ -163,6 +176,6 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
       <div className="bg-stone-50 py-3 px-5 flex justify-center border-t border-stone-100 italic">
         <span className="text-[10px] font-black text-stone-300 uppercase tracking-widest leading-none">Diagrama Digital</span>
       </div>
-    </div>
+    </div >
   );
 };

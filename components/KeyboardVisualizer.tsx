@@ -130,14 +130,14 @@ export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNot
                                 <div
                                     key={`w-${i}`}
                                     style={{ width: `${100 / WHITE_KEYS_COUNT}%` }}
-                                    className={`h-full border-r border-stone-300 relative flex items-end justify-center pb-3 transition-all duration-300 rounded-b-sm
+                                    className={`h-full border-r border-stone-300 relative transition-all duration-300 rounded-b-sm
                                         ${active ? 'bg-gradient-to-t from-orange-50 to-white' : 'bg-gradient-to-b from-stone-50 to-white'}`}
                                 >
                                     {/* Key shadow detail */}
                                     <div className="absolute top-0 w-full h-[1px] bg-black/10" />
 
                                     {active && (
-                                        <div className="w-6 h-6 rounded-full bg-[#1A110D] shadow-2xl z-20 flex items-center justify-center border-2 border-orange-500/50 scale-110 mb-2">
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-[#1A110D] shadow-2xl z-20 flex items-center justify-center border-2 border-orange-500/50">
                                             <span className="text-[8px] font-black text-white leading-none tracking-tighter uppercase">{noteName}</span>
                                         </div>
                                     )}
@@ -157,13 +157,13 @@ export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNot
                             return (
                                 <div
                                     key={`b-${bk.absIndex}`}
-                                    className={`absolute top-0 h-[65%] w-[6.8%] -ml-[3.4%] z-30 flex items-end justify-center pb-2 rounded-b-[3px] shadow-[0_8px_15px_rgba(0,0,0,0.4)] transition-all duration-200
-                                        ${active ? 'bg-[#3C2415] border-b-[4px] border-orange-500 scale-[1.02]' : 'bg-gradient-to-b from-[#2A180B] via-[#1A110D] to-black'}`}
+                                    className={`absolute top-0 h-[65%] w-[6.8%] -ml-[3.4%] z-30 flex items-center justify-center pb-2 rounded-b-[3px] shadow-[0_8px_15px_rgba(0,0,0,0.4)] transition-all duration-200
+                                        ${active ? 'bg-[#3C2415] border-b-[4px] border-orange-500' : 'bg-gradient-to-b from-[#2A180B] via-[#1A110D] to-black'}`}
                                     style={{ left: `${left}%` }}
                                 >
                                     {active && (
-                                        <div className="w-4 h-4 rounded-full bg-white shadow-xl flex items-center justify-center border border-orange-200">
-                                            <span className="text-[6px] font-black text-[#E87A2C] leading-none mb-[0.5px] uppercase">{noteName}</span>
+                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow-xl flex items-center justify-center border border-orange-200">
+                                            <span className="text-[6px] font-black text-[#E87A2C] leading-none uppercase">{noteName}</span>
                                         </div>
                                     )}
                                     {/* Black key top reflect */}

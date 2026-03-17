@@ -2,7 +2,8 @@
 import { Instrument } from '../types';
 
 // O proxy no vite.config.ts redireciona /emusys-api para https://api.emusys.com.br
-const EDGE_FUNCTION_URL = 'https://wayigtlilhvutbfvxgae.supabase.co/functions/v1/emusys-proxy';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/emusys-proxy`;
 
 export interface EmusysStudent {
     nome: string;

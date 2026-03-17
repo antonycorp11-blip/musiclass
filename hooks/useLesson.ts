@@ -193,7 +193,7 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
         setRecordings(prev => [...prev, newRecording]);
     }, []);
 
-    const exportSuccess = useCallback(async (): Promise<any[]> => {
+    const exportSuccess = useCallback(async (): Promise<any> => {
         if (!selectedStudent || !currentUser) return recordings;
 
         let finalRecordings = [...recordings];
@@ -235,15 +235,15 @@ export const useLesson = (selectedStudent: Student | null, currentUser: Teacher 
             drums: drumsData
         };
 
-        const { error } = await supabase.from('mc_lesson_history').insert([{
+        const { data: inserted, error } = await supabase.from('mc_lesson_history').insert([{
             student_id: selectedStudent.id,
             teacher_id: currentUser.id,
             objective: currentObjective,
             report_data: reportData
-        }]);
+        }]).select('id').single();
 
         if (error) console.error("Erro ao salvar histórico:", error);
-        return finalRecordings;
+        return { recordings: finalRecordings, lessonId: inserted?.id };
     }, [selectedStudent, currentUser, recordings, currentChords, currentScales, currentTabs, currentSolos, exercises, drumsData, currentObjective]);
 
     return {

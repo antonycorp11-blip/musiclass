@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Instrument } from '../types';
 import { X, Save, Guitar as GuitarIcon, Keyboard as KeyboardIcon, Trash2, Music } from 'lucide-react';
 import { MusicEngine } from '../services/musicEngine';
+import { useToast } from '../context/ToastContext';
 
 interface ManualChordEditorProps {
     instrument: Instrument;
@@ -11,6 +12,7 @@ interface ManualChordEditorProps {
 }
 
 export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument, onSave, onClose }) => {
+    const { showToast } = useToast();
     const [chordName, setChordName] = useState('');
     const [selectedNotes, setSelectedNotes] = useState<number[]>([]);
 
@@ -70,7 +72,10 @@ export const ManualChordEditor: React.FC<ManualChordEditorProps> = ({ instrument
     const currentNotesDisplay = getCurrentNotes();
 
     const handleSave = () => {
-        if (!chordName) return alert("Dê um nome ao acorde!");
+        if (!chordName) {
+            showToast("Dê um nome ao acorde!", "info");
+            return;
+        }
 
         if (isKeyboard) {
             onSave(chordName, selectedNotes, true);

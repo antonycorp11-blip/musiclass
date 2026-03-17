@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.pdf
+.vite_log.txt
+.env
+.env.*
+!.env.example

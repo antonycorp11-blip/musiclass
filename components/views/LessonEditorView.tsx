@@ -1,8 +1,8 @@
 
 import React from 'react';
 import {
-    Zap, Settings2, MousePointer2, Trash2, Layout,
-    ListTodo, Plus, Music, PlusCircle, Disc, Sparkles, Upload
+    Zap, Settings2, MousePointer2, Trash2, Layout, X,
+    ListTodo, Plus, Music, PlusCircle, Disc, Sparkles, Upload, ScrollText, ClipboardList, Check
 } from 'lucide-react';
 import { Instrument, Student, Teacher } from '../../types';
 import { ROOTS, CHORD_TYPES, SCALES } from '../../constants';
@@ -10,6 +10,17 @@ import { ChordVisualizer } from '../ChordVisualizer';
 import { SoloEditor } from '../SoloEditor';
 import { TabEditor } from '../TabEditor';
 import { DrumsStudio } from '../DrumsStudio';
+import { getPedagogicalSuggestion } from '../../services/geminiService';
+import { PedagogicalRadar } from '../PedagogicalRadar';
+import {
+    fetchCurriculumTopics,
+    fetchStudentCurriculumProgress,
+    calculatePedagogicalRadar,
+    getInstrumentGroup,
+    applyTopicToStudent
+} from '../../services/curriculumService';
+import { CurriculumTopic, StudentTopicProgress } from '../../types';
+import { useToast } from '../../context/ToastContext';
 
 interface LessonEditorViewProps {
     selectedStudent: Student;
@@ -67,6 +78,7 @@ interface LessonEditorViewProps {
     // New Version 7 Props
     onSaveTemplate: () => void;
     onToggleGallery: () => void;
+    onToggleCurriculum: () => void;
     onAudioUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -121,10 +133,36 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
     setSelBass,
     onSaveTemplate,
     onToggleGallery,
+    onToggleCurriculum,
     onAudioUpload
 }) => {
+    const { showToast } = useToast();
+    const [isAILoading, setIsAILoading] = React.useState(false);
+
+    const handleGenerateAISuggestion = async () => {
+        if (!currentObjective.trim()) {
+            showToast("Por favor, descreva o tema da aula ou objetivo na pauta abaixo para que a IA possa gerar sugestões.", "info");
+            return;
+        }
+
+        setIsAILoading(true);
+        try {
+            const result = await getPedagogicalSuggestion(
+                selectedStudent.instrument,
+                selectedStudent.level,
+                currentObjective
+            );
+            setCurrentObjective(currentObjective + "\n\n--- SUGESTÕES IA MUSICLASS ---\n" + result);
+        } catch (e) {
+            showToast("Erro ao gerar sugestões.", "error");
+        } finally {
+            setIsAILoading(false);
+        }
+    };
+
     return (
         <div className="max-w-7xl mx-auto space-y-12 animate-fade-in pb-32">
+
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <button onClick={() => setActiveTab('students')} className="text-[#3C2415]/40 hover:text-[#E87A2C] text-[10px] font-black uppercase tracking-widest mb-2 transition-colors">← Voltar aos alunos</button>
@@ -382,10 +420,20 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
                     <section className="bg-white p-10 rounded-[48px] border border-[#3C2415]/5 shadow-sm sticky top-12">
                         <div className="space-y-10">
                             <div>
-                                <h3 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.3em] mb-4 flex items-center gap-2">Pauta Pedagógica</h3>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.3em] flex items-center gap-2">Pauta Pedagógica</h3>
+                                    <button
+                                        onClick={handleGenerateAISuggestion}
+                                        disabled={isAILoading}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all ${isAILoading ? 'bg-orange-100 text-orange-400' : 'bg-orange-50 text-[#E87A2C] hover:bg-[#E87A2C] hover:text-white'}`}
+                                    >
+                                        <Sparkles className={`w-3 h-3 ${isAILoading ? 'animate-spin' : ''}`} />
+                                        {isAILoading ? 'Pensando...' : 'Sugestões IA'}
+                                    </button>
+                                </div>
                                 <textarea value={currentObjective} onChange={(e) => setCurrentObjective(e.target.value)} className="w-full bg-[#FBF6F0] border-none rounded-[32px] p-8 h-60 text-sm font-medium focus:ring-2 focus:ring-[#E87A2C]" placeholder="Descreva os objetivos da aula..." />
                             </div>
-                            <button onClick={onSaveTemplate} className="w-full bg-[#FBF6F0] text-[#3C2415] py-5 rounded-[24px] font-black text-[10px] uppercase tracking-widest border border-[#3C2415]/10 hover:bg-[#1A110D] hover:text-white transition-all flex items-center justify-center gap-3">
+                            <button onClick={onSaveTemplate} className="w-full bg-[#FBF6F0] text-[#3C2415] py-5 rounded-[24px] font-black text-[10px] uppercase tracking-widest border border-[#3C2415]/10 hover:bg-white transition-all flex items-center justify-center gap-3">
                                 <PlusCircle className="w-4 h-4" /> Salvar como Modelo
                             </button>
                             {selectedStudent.id !== 'temp' ? (
@@ -400,6 +448,7 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
                     </section>
                 </div>
             </div>
+
         </div>
     );
 };

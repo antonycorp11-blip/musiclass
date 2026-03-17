@@ -5,7 +5,8 @@ import { jsPDF } from 'jspdf';
 import { ChordVisualizer } from './ChordVisualizer';
 import { Logo } from './Logo';
 import { Instrument, Level, SoloNote } from '../types';
-import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones, Clock } from 'lucide-react';
+import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones, Clock, CheckCircle2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 
 interface StudentPreviewProps {
@@ -22,19 +23,32 @@ interface StudentPreviewProps {
     drums?: { rhythms: any[], rudiments: any[] };
     lessonCount?: number;
     contractTotal?: number;
+    lessonId?: string;
+    designSettings: any;
     onClose: () => void;
-    onExport?: () => Promise<any[]>;
+    onExport?: () => Promise<{ recordings: any[], lessonId?: string }>;
 }
 
 export const StudentPreview: React.FC<StudentPreviewProps> = ({
-    studentName, teacherName, instrument, objective, chords, scales, exercises, tabs, solos = [], recordings = [], drums = { rhythms: [], rudiments: [] }, lessonCount, contractTotal, onClose, onExport
+    studentName, teacherName, instrument, objective, chords, scales, exercises, tabs, solos = [], recordings = [], drums = { rhythms: [], rudiments: [] }, lessonCount, contractTotal, lessonId: initialLessonId, onClose, onExport, designSettings
 }) => {
+    const { showToast } = useToast();
     const today = new Date().toLocaleDateString('pt-BR');
     const documentRef = useRef<HTMLDivElement>(null);
+    const [lessonId, setLessonId] = useState(initialLessonId);
 
     const [viewScale, setViewScale] = useState(1);
     const [isExporting, setIsExporting] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+
+
+    const formatShortName = (name: string) => {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length <= 2) return name;
+        return `${parts[0]} ${parts[parts.length - 1]}`;
+    };
+
+    const shortStudentName = formatShortName(studentName);
 
     useEffect(() => {
         const updateScale = () => {
@@ -81,7 +95,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             const bodyElem = document.getElementById('lesson-body');
 
             if (!headerElem || !bodyElem) {
-                alert("Erro ao identificar componentes para impressão.");
+                showToast("Erro ao identificar componentes para impressão.", "error");
                 setIsExporting(false);
                 return;
             }
@@ -165,11 +179,11 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             }
 
             pdf.save(`${studentName} - IMPRESSAO - ${today}.pdf`);
-            alert("PDF Profissional para Impressão gerado com sucesso!");
+            showToast("PDF Profissional para Impressão gerado com sucesso!", "success");
 
         } catch (error) {
             console.error('Erro no Print PDF:', error);
-            alert('Falha interna na geração do PDF de Impressão.');
+            showToast('Falha interna na geração do PDF de Impressão.', "error");
         } finally {
             setIsExporting(false);
         }
@@ -179,17 +193,25 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
         setIsExporting(true);
         try {
             console.log('Iniciando exportação de PDF...');
-            if ((window as any).logDebug) (window as any).logDebug('Aguardando sincronização...');
+            let currentId = lessonId;
 
             // 1. Sincronização e Delay para estabilização do DOM
-            if (onExport) await onExport();
-            await new Promise(r => setTimeout(r, 1000)); // Delay maior para tablets
+            if (onExport) {
+                const result = await onExport();
+                if (result.lessonId) {
+                    currentId = result.lessonId;
+                    setLessonId(result.lessonId);
+                    // Delay extra para garantir que o React renderizou o botão de confirmação no DOM
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            }
+            await new Promise(r => setTimeout(r, 400));
 
             // Busca o elemento de forma robusta
             const element = document.getElementById('lesson-document') || documentRef.current;
 
             if (!element) {
-                alert("Erro Fatal: O documento da aula não foi encontrado para exportação.");
+                showToast("Erro Fatal: O documento da aula não foi encontrado para exportação.", "error");
                 setIsExporting(false);
                 return;
             }
@@ -239,20 +261,44 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
             });
 
+            // 1.5 Captura o ID novo ou o existente de forma segura
+            const finalLessonId = currentId; // Ja atualizado pelo result.lessonId no topo
+
+            // Link de Confirmação (Mapear os 5 botões)
+            [1, 2, 3, 4, 5].forEach(num => {
+                const btn = element.querySelector(`.confirm-read-pdf-${num}`);
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    const parentRect = element.getBoundingClientRect();
+                    const relTop = rect.top - parentRect.top;
+                    const relLeft = rect.left - parentRect.left;
+
+                    const pdfX = (relLeft * 210) / parentRect.width;
+                    const pdfY = (relTop * imgHeight) / parentRect.height;
+                    const pdfW = (rect.width * 210) / parentRect.width;
+                    const pdfH = (rect.height * imgHeight) / parentRect.height;
+
+                    // IMPORTANTE: Se o lessonId mudou nesta execução, o estado ainda não reflete.
+                    // Mas como chamamos setLessonId(result.lessonId) lá em cima, o valor seguro é o que está no DOM ou no result.
+                    const confirmUrl = `${window.location.origin}${window.location.pathname}?confirm_read=${finalLessonId}&session=${num}&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
+                    pdf.link(pdfX, pdfY, pdfW, pdfH, { url: confirmUrl });
+                }
+            });
+
             console.log('Salvando...');
             pdf.save(`${studentName} - ${instrument} - ${today}.pdf`);
 
             if ((window as any).logDebug) (window as any).logDebug('PDF baixado!');
         } catch (error) {
             console.error('Erro ao baixar PDF:', error);
-            alert('Erro na Geracao do PDF: ' + (error instanceof Error ? error.message : "Falha desconhecida"));
+            showToast('Erro na Geracao do PDF: ' + (error instanceof Error ? error.message : "Falha desconhecida"), "error");
         } finally {
             setIsExporting(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-[#0A0503]/98 backdrop-blur-xl z-[100] overflow-y-auto font-sans p-2 md:p-6">
+        <div className="fixed inset-0 bg-[#0A0503]/98 backdrop-blur-xl z-[100] overflow-y-auto font-sans p-2 md:p-6 no-scrollbar">
             {/* Action Bar */}
             <div className="max-w-4xl mx-auto mb-4 flex justify-between items-center bg-black backdrop-blur-md p-2 px-4 rounded-full border border-white/20 sticky top-0 z-50 shadow-2xl">
                 <div className="flex items-center gap-3">
@@ -306,32 +352,80 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 >
                     {/* Slim Header */}
                     <div id="lesson-header" className="bg-[#1A110D] border-b-[6px] border-[#E87A2C]">
-                        <div className="p-10 flex flex-row justify-between items-center gap-12">
-                            {/* Brand & Instrument */}
-                            <div className="flex flex-col gap-4">
-                                <div className="flex flex-col gap-2">
-                                    <img src="/Logo-Laranja.png" alt="Logo" className="h-10 w-auto object-contain brightness-110 self-start" />
-                                    <span className="text-[10px] font-black text-white uppercase tracking-tighter italic">MusiClass</span>
-                                </div>
-                                <h1 className="text-xl font-black text-white uppercase tracking-tighter">Prática de {instrument}</h1>
+                        <div 
+                            className="flex flex-row items-center gap-0"
+                            style={{ padding: `${designSettings?.headerPaddingV || 32}px ${designSettings?.headerPaddingH || 48}px` }}
+                        >
+                            {/* Brand Zone */}
+                            <div 
+                                className="flex flex-col shrink-0 pr-10"
+                                style={{ transform: `translateX(${designSettings?.logoOffset || 0}px)` }}
+                            >
+                                <img 
+                                    src="/Logo-Laranja.png" 
+                                    alt="Logo" 
+                                    className="w-auto object-contain self-start" 
+                                    style={{ 
+                                        height: `${designSettings.logoHeight}px`,
+                                        marginBottom: designSettings.showMusiClass ? '8px' : '0'
+                                    }}
+                                />
+                                {designSettings.showMusiClass && (
+                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] font-sans ml-1">MusiClass</span>
+                                )}
                             </div>
 
-                            {/* Info Grid - Simplified */}
-                            <div className="flex gap-12">
-                                <div className="flex flex-col border-l-2 border-[#E87A2C] pl-5">
-                                    <span className="text-[13px] font-black text-white uppercase tracking-tight leading-tight">{studentName}</span>
-                                    <div className="flex items-center gap-3 mt-2">
-                                        <span className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">{today}</span>
-                                        {lessonCount !== undefined && (
-                                            <span className="text-[9px] font-black text-[#1A110D] bg-[#E87A2C] px-3 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap shadow-xl flex items-center gap-1.5">
-                                                <Clock className="w-3 h-3" /> Aula {lessonCount} {contractTotal ? `/ ${contractTotal}` : ''}
-                                            </span>
-                                        )}
-                                    </div>
+                            {/* Vertical Divider 1 */}
+                            <div className="h-12 w-[2px] bg-[#E87A2C]/40 shrink-0" />
+
+                            {/* Info Zone */}
+                            <div 
+                                className="flex-1 flex flex-col justify-center px-6 min-w-0"
+                                style={{ transform: `translateX(${designSettings.studentOffset}px)` }}
+                            >
+                                <div className="mb-2">
+                                    <span 
+                                        className="font-black text-white uppercase tracking-tight leading-none whitespace-nowrap block"
+                                        style={{ fontSize: `${designSettings.studentFontSize}px` }}
+                                    >
+                                        {shortStudentName}
+                                    </span>
                                 </div>
-                                <div className="flex flex-col border-l-2 border-white/20 pl-5">
-                                    <span className="text-[11px] font-black text-white uppercase tracking-tight opacity-70">Prof. {teacherName}</span>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-[12px] font-bold text-[#E87A2C] uppercase tracking-widest leading-none">
+                                        {today}
+                                    </span>
+                                    {lessonCount !== undefined && (
+                                        <div 
+                                            className="inline-flex items-center h-6 px-3 bg-[#E87A2C] rounded-md shrink-0 shadow-lg shadow-orange-500/20 relative"
+                                            style={{ 
+                                                left: `${designSettings?.badgeOffset || 0}px`,
+                                                top: `${designSettings?.badgeY || 0}px`,
+                                                transform: `scale(${designSettings?.badgeScale || 1})`,
+                                                transformOrigin: 'left center'
+                                            }}
+                                        >
+                                            <span className="text-[10px] font-black text-[#1A110D] uppercase tracking-tight leading-none pt-[1px]">Aula {lessonCount} {contractTotal ? `/ ${contractTotal}` : ''}</span>
+                                        </div>
+                                    )}
                                 </div>
+                            </div>
+
+                            {/* Vertical Divider 2 */}
+                            <div className="h-12 w-[1px] bg-white/10 shrink-0 mx-8" />
+
+                            {/* Teacher Zone */}
+                            <div 
+                                className="shrink-0 text-right flex flex-col justify-center w-[220px]"
+                                style={{ transform: `translateX(${designSettings.teacherOffset}px)` }}
+                            >
+                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1 leading-none">Instrutor</span>
+                                <span 
+                                    className="font-black text-white/70 uppercase tracking-tight leading-tight whitespace-nowrap"
+                                    style={{ fontSize: `${designSettings.teacherFontSize}px` }}
+                                >
+                                    Prof. {teacherName}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -348,6 +442,38 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             </section>
                         )}
 
+                        {/* Seção de Confirmação Mutupla (5 Botões) */}
+                        <div className={`p-6 rounded-[40px] border-2 flex flex-col md:flex-row items-center justify-between gap-6 group overflow-hidden relative ${lessonId ? 'bg-emerald-50 border-emerald-100' : 'bg-stone-50 border-stone-200 shadow-sm opacity-80'}`}>
+                            <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16" />
+                            <div className="flex items-center gap-4 z-10 shrink-0">
+                                <div className={`w-14 h-14 rounded-3xl flex items-center justify-center text-white shadow-xl ${lessonId ? 'bg-emerald-500' : 'bg-stone-400'}`}>
+                                    <CheckCircle2 className="w-7 h-7" />
+                                </div>
+                                <div>
+                                    <h4 className={`text-sm font-black uppercase tracking-tighter ${lessonId ? 'text-emerald-900' : 'text-stone-600'}`}>Diário de Treino</h4>
+                                    <p className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-emerald-500 transition-colors ${lessonId ? 'text-emerald-600' : 'text-stone-400'}`}>
+                                        Confirme cada vez que treinar (Max 5x)
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 z-10">
+                                {[1, 2, 3, 4, 5].map((num) => (
+                                    <div
+                                        key={num}
+                                        className={`confirm-read-pdf-${num} w-10 h-10 rounded-xl shadow-lg transform active:scale-95 transition-all cursor-default ${lessonId ? 'bg-white border border-emerald-200' : 'bg-stone-200'
+                                            }`}
+                                    >
+                                        <svg viewBox="0 0 40 40" className="w-full h-full">
+                                            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill={lessonId ? "#10B981" : "#A8A29E"} fontWeight="900" fontSize="16">{num}</text>
+                                        </svg>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="hidden confirm-read-pdf">Confirmar Leitura Geral</div>
+                        </div>
+
                         <div className="flex flex-col gap-10">
                             {/* Seção de Harmonias - Ocultar para Bateria */}
                             {chords.length > 0 && instrument !== Instrument.VOCALS && instrument !== Instrument.DRUMS && (
@@ -357,9 +483,13 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                             <div className="w-4 h-4 rounded bg-[#E87A2C]/10 flex items-center justify-center">
                                                 <Music className="w-2.5 h-2.5 text-[#E87A2C]" />
                                             </div>
-                                            <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest">Estrutura Harmônica</h2>
+                                            <svg viewBox="0 0 150 20" className="h-4 w-32">
+                                                <text x="0" y="50%" dominantBaseline="central" fill="#1C1917" fontWeight="900" fontSize="10" style={{ letterSpacing: '0.1em' }}>ESTRUTURA HARMÔNICA</text>
+                                            </svg>
                                         </div>
-                                        <span className="text-[11px] font-black text-stone-500 uppercase">{chords.length} ACORDES</span>
+                                        <svg viewBox="0 0 100 20" className="h-4 w-20">
+                                            <text x="100%" y="50%" textAnchor="end" dominantBaseline="central" fill="#78716C" fontWeight="900" fontSize="11">{chords.length} ACORDES</text>
+                                        </svg>
                                     </div>
                                     <div className={`grid ${instrument?.toLowerCase().includes('violão') || instrument?.toLowerCase().includes('guitarra') || instrument?.toLowerCase().includes('baixo') || instrument?.toLowerCase().includes('violino') ? 'grid-cols-4' : 'grid-cols-2'} gap-4`}>
                                         {chords.map((chord, i) => (
@@ -383,7 +513,9 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 {/* Left Side: Solos */}
                                 {solos.length > 0 && (
                                     <div className={`${exercises.length > 0 ? 'col-span-8' : 'col-span-1'} space-y-6`}>
-                                        <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Solos e Melodias (Bimanual)</h2>
+                                        <svg viewBox="0 0 200 20" className="h-4 w-48">
+                                            <text x="0" y="50%" dominantBaseline="central" fill="#1C1917" fontWeight="900" fontSize="10" style={{ letterSpacing: '0.1em' }}>SOLOS E MELODIAS (BIMANUAL)</text>
+                                        </svg>
                                         <div className="space-y-4">
                                             {solos.map((solo, i) => (
                                                 <div key={i} className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
@@ -402,16 +534,20 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                     <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
                                                                         <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                             {harmonyNotes.map((n, idx) => (
-                                                                                <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-red-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
-                                                                                    {n.note}
+                                                                                <div key={idx} className="h-6 w-6 bg-red-600 rounded-md shadow-sm">
+                                                                                    <svg viewBox="0 0 24 24" className="w-full h-full">
+                                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="10">{n.note}</text>
+                                                                                    </svg>
                                                                                 </div>
                                                                             ))}
                                                                         </div>
                                                                         <div className="h-px bg-stone-200 w-full" />
                                                                         <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                             {soloNotes.map((n, idx) => (
-                                                                                <div key={idx} className="flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-blue-600 text-white rounded-md font-black text-[9px] shadow-sm leading-tight">
-                                                                                    {n.note}
+                                                                                <div key={idx} className="h-6 w-6 bg-blue-600 rounded-md shadow-sm">
+                                                                                    <svg viewBox="0 0 24 24" className="w-full h-full">
+                                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="10">{n.note}</text>
+                                                                                    </svg>
                                                                                 </div>
                                                                             ))}
                                                                         </div>
@@ -429,14 +565,22 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 {/* Right Side: Exercises */}
                                 {exercises.length > 0 && (
                                     <div className={`${solos.length > 0 ? 'col-span-4' : 'col-span-1'} space-y-10`}>
-                                        <h2 className="text-[10px] font-black text-stone-800 uppercase tracking-widest mb-4">Checklist de Prática</h2>
+                                        <svg viewBox="0 0 200 20" className="h-4 w-48">
+                                            <text x="0" y="50%" dominantBaseline="central" fill="#1C1917" fontWeight="900" fontSize="10" style={{ letterSpacing: '0.1em' }}>CHECKLIST DE PRÁTICA</text>
+                                        </svg>
                                         <div className={`space-y-2 ${solos.length === 0 ? 'grid grid-cols-2 gap-4 space-y-0' : ''}`}>
                                             {exercises.map((ex, i) => (
                                                 <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
-                                                    <div className="w-6 h-6 bg-[#1A110D] rounded-md flex items-center justify-center text-[9px] font-black text-white shrink-0 group-hover:bg-[#E87A2C] leading-tight">
-                                                        {i + 1}
+                                                    <div className="w-6 h-6 bg-[#1A110D] rounded-md text-white shrink-0 group-hover:bg-[#E87A2C]">
+                                                        <svg viewBox="0 0 24 24" className="w-full h-full">
+                                                            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontWeight="900" fontSize="10">{i + 1}</text>
+                                                        </svg>
                                                     </div>
-                                                    <span className="text-[11px] font-black text-[#3C2415] leading-tight">{ex}</span>
+                                                    <div className="h-4 flex-grow">
+                                                        <svg viewBox="0 0 400 20" className="h-full w-full">
+                                                            <text x="0" y="50%" dominantBaseline="central" fill="#3C2415" fontWeight="900" fontSize="11">{ex.toUpperCase()}</text>
+                                                        </svg>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -474,8 +618,10 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 justify-end flex-grow">
                                                     {scale.notes.map((n: string, ni: number) => (
-                                                        <div key={ni} className="inline-flex items-center justify-center w-9 h-9 bg-white/10 border border-white/10 font-black text-white text-[11px] rounded-xl shadow-lg leading-tight">
-                                                            {n}
+                                                        <div key={ni} className="w-9 h-9 bg-white/10 border border-white/10 rounded-xl shadow-lg">
+                                                            <svg viewBox="0 0 36 36" className="w-full h-full">
+                                                                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="14">{n}</text>
+                                                            </svg>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -524,22 +670,24 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                             const isActive = stepParts.includes(partId) || (partId === 'crash' && stepParts.includes('crash/ride'));
                                                                             if (!isActive) return null;
                                                                             return (
-                                                                                <div key={partId} className={`w-5 h-5 md:w-7 md:h-7 rounded-md flex items-center justify-center text-[10px] font-black text-white ${(partId === 'kick') ? 'bg-rose-500' :
+                                                                                <div key={partId} className={`w-5 h-5 md:w-7 md:h-7 rounded-md ${(partId === 'kick') ? 'bg-rose-500' :
                                                                                     (partId === 'snare') ? 'bg-blue-600' :
                                                                                         (partId === 'hihat') ? 'bg-orange-500' :
                                                                                             (partId === 'crash' || partId === 'crash/ride') ? 'bg-yellow-500' :
                                                                                                 (partId === 'tom1') ? 'bg-emerald-500' :
                                                                                                     (partId === 'tom2') ? 'bg-emerald-600' :
-                                                                                                        (partId === 'floor') ? 'bg-purple-600' :
-                                                                                                            'bg-stone-500'
-                                                                                    }`}>
-                                                                                    {(partId === 'kick') ? '🥁' :
-                                                                                        (partId === 'snare') ? '⊚' :
-                                                                                            (partId === 'hihat') ? '×' :
-                                                                                                (partId === 'crash' || partId === 'crash/ride') ? '✳' :
-                                                                                                    (partId === 'tom1') ? '◦' :
-                                                                                                        (partId === 'tom2') ? '◦' :
-                                                                                                            (partId === 'floor') ? '◯' : '◦'}
+                                                                                                        (partId === 'floor') ? 'bg-purple-600' : 'bg-stone-500'}`}>
+                                                                                    <svg viewBox="0 0 24 24" className="w-full h-full">
+                                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="12">
+                                                                                            {(partId === 'kick') ? '🥁' :
+                                                                                                (partId === 'snare') ? '⊚' :
+                                                                                                    (partId === 'hihat') ? '×' :
+                                                                                                        (partId === 'crash' || partId === 'crash/ride') ? '✳' :
+                                                                                                            (partId === 'tom1') ? '◦' :
+                                                                                                                (partId === 'tom2') ? '◦' :
+                                                                                                                    (partId === 'floor') ? '◯' : '◦'}
+                                                                                        </text>
+                                                                                    </svg>
                                                                                 </div>
                                                                             );
                                                                         })}
@@ -563,8 +711,10 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                         <p className="text-[8px] font-black text-stone-400 uppercase tracking-widest mb-3">{rud.title}</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {rud.pattern.map((hand: string, sIdx: number) => (
-                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${hand === 'R' ? 'bg-[#E87A2C] text-white' : 'bg-[#1A110D] text-white'} leading-tight`}>
-                                                                    {hand}
+                                                                <div key={sIdx} className={`w-8 h-8 rounded-lg ${hand === 'R' ? 'bg-[#E87A2C]' : 'bg-[#1A110D]'} text-white shadow-sm`}>
+                                                                    <svg viewBox="0 0 32 32" className="w-full h-full">
+                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="14">{hand}</text>
+                                                                    </svg>
                                                                 </div>
                                                             ))}
                                                         </div>

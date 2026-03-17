@@ -2,7 +2,9 @@
 import React from 'react';
 import { Upload, RefreshCw, Plus } from 'lucide-react';
 import { Logo } from '../Logo';
-import { Student, Instrument } from '../../types';
+import { Student, Instrument, CurriculumTopic, StudentTopicProgress } from '../../types';
+import { calculatePedagogicalRadar, getInstrumentGroup } from '../../services/curriculumService';
+import { AlertCircle } from 'lucide-react';
 
 interface StudentsViewProps {
     teacherStudents: Student[];
@@ -10,6 +12,8 @@ interface StudentsViewProps {
     onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onEmusysSync: () => void;
     onAddStudentClick: () => void;
+    allTopics: CurriculumTopic[];
+    allProgress: StudentTopicProgress[];
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
@@ -17,7 +21,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     onSelectStudent,
     onFileUpload,
     onEmusysSync,
-    onAddStudentClick
+    onAddStudentClick,
+    allTopics,
+    allProgress
 }) => {
     return (
         <div className="max-w-6xl mx-auto animate-fade-in">
@@ -46,33 +52,51 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
-                {teacherStudents.map(student => (
-                    <div key={student.id} onClick={() => onSelectStudent(student)} className="group bg-white p-8 rounded-[48px] border border-[#3C2415]/5 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#E87A2C]/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700" />
-                        <div className="w-16 h-16 bg-[#FBF6F0] rounded-[24px] flex items-center justify-center text-[#E87A2C] text-2xl font-black mb-6 group-hover:bg-[#E87A2C] group-hover:text-white transition-all duration-500">{student.name.charAt(0)}</div>
-                        <h4 className="font-black text-[#3C2415] text-2xl tracking-tighter uppercase mb-1">{student.name}</h4>
-                        <div className="flex items-center gap-2 mb-6">
-                            <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-[#1A110D] text-white rounded-full">{student.instrument}</span>
-                            <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-white border border-[#3C2415]/10 text-[#3C2415] rounded-full">{student.level}</span>
-                        </div>
+                {teacherStudents.map(student => {
+                    // Cálculo rápido do radar para este aluno
+                    const group = getInstrumentGroup(student.instrument);
+                    const studentTopics = allTopics.filter(t => t.group_name === group);
+                    const studentProgress = allProgress.filter(p => p.student_id === student.id);
+                    const radar = studentTopics.length > 0 ? calculatePedagogicalRadar(student, studentTopics, studentProgress) : null;
 
-                        {/* Barra de Progresso do Contrato */}
-                        {student.contract_total && student.contract_total > 0 && (
-                            <div className="space-y-2 mt-auto">
-                                <div className="flex justify-between items-end">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#3C2415]/30">Progresso</span>
-                                    <span className="text-[11px] font-black text-[#E87A2C]">{student.lesson_count}/{student.contract_total} <span className="text-[8px] opacity-50">aulas</span></span>
+                    return (
+                        <div key={student.id} onClick={() => onSelectStudent(student)} className="group bg-white p-8 rounded-[48px] border border-[#3C2415]/5 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-[#E87A2C]/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700" />
+
+                            {/* Alerta de Currículo Pedagógico */}
+                            {radar && radar.status !== 'ok' && (
+                                <div className={`absolute top-6 right-6 px-3 py-1.5 rounded-xl flex items-center gap-2 animate-pulse shadow-sm ${radar.status === 'critical' ? 'bg-rose-500 text-white' : 'bg-orange-500 text-white'
+                                    }`}>
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    <span className="text-[8px] font-black uppercase tracking-widest">Matéria Pendente</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-[#3C2415]/5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-[#E87A2C] transition-all duration-1000 ease-out rounded-full"
-                                        style={{ width: `${Math.min(100, (student.lesson_count || 0) / student.contract_total * 100)}%` }}
-                                    />
-                                </div>
+                            )}
+
+                            <div className="w-16 h-16 bg-[#FBF6F0] rounded-[24px] flex items-center justify-center text-[#E87A2C] text-2xl font-black mb-6 group-hover:bg-[#E87A2C] group-hover:text-white transition-all duration-500">{student.name.charAt(0)}</div>
+                            <h4 className="font-black text-[#3C2415] text-2xl tracking-tighter uppercase mb-1">{student.name}</h4>
+                            <div className="flex items-center gap-2 mb-6">
+                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-[#1A110D] text-white rounded-full">{student.instrument}</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-white border border-[#3C2415]/10 text-[#3C2415] rounded-full">{student.level}</span>
                             </div>
-                        )}
-                    </div>
-                ))}
+
+                            {/* Barra de Progresso do Contrato */}
+                            {student.contract_total && student.contract_total > 0 && (
+                                <div className="space-y-2 mt-auto">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#3C2415]/30">Progresso</span>
+                                        <span className="text-[11px] font-black text-[#E87A2C]">{student.lesson_count}/{student.contract_total} <span className="text-[8px] opacity-50">aulas</span></span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-[#3C2415]/5 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-[#E87A2C] transition-all duration-1000 ease-out rounded-full"
+                                            style={{ width: `${Math.min(100, (student.lesson_count || 0) / student.contract_total * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
                 {teacherStudents.length === 0 && (
                     <div className="col-span-full py-20 text-center opacity-20 font-black uppercase text-xs tracking-[0.5em]">Nenhum aluno cadastrado para você</div>
                 )}

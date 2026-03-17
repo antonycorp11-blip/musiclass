@@ -91,3 +91,36 @@ export interface LessonHistory {
     instrument: string;
   };
 }
+
+// --- SISTEMA CURRICULAR ---
+
+export type InstrumentGroup = 'harmono_melodico' | 'percussao' | 'vocal';
+
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export interface CurriculumTopic {
+  id: string;
+  group_name: InstrumentGroup;
+  month_index: number;
+  title: string;
+  content_text: string;
+  quiz_json: QuizQuestion[];
+  created_at?: string;
+}
+
+export interface StudentTopicProgress {
+  id: string;
+  student_id: string;
+  topic_id: string;
+  status: 'pending' | 'applied' | 'quiz_completed';
+  quiz_score?: number;
+  applied_at?: string;
+  completed_at?: string;
+  teacher_id?: string;
+  qr_code_token?: string;
+  topic?: CurriculumTopic; // Joined data
+}

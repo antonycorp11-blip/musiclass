@@ -116,6 +116,19 @@ export const useStudents = (currentUser: Teacher | null) => {
         }
     }, [fetchInitialData]);
 
+    const resetQuizzes = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.from('mc_student_topics')
+                .update({ status: 'applied', quiz_score: 0 })
+                .neq('status', 'not_started');
+            if (error) throw error;
+            await fetchInitialData();
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchInitialData]);
+
     const addTeacher = useCallback(async (name: string, pass: string) => {
         if (pass.length !== 4 || isNaN(Number(pass))) {
             throw new Error("A senha deve ter exatamente 4 dígitos numéricos.");
@@ -213,13 +226,10 @@ export const useStudents = (currentUser: Teacher | null) => {
                 }
             }
 
-            // EXECUTAR ATUALIZAÇÕES COM VERIFICAÇÃO DE ERRO
+            // EXECUTAR ATUALIZAÇÕES EM LOTE (BATCH UPSERT)
             if (toUpdate.length > 0) {
-                for (const up of toUpdate) {
-                    const { id, ...updateData } = up;
-                    const { error: upError } = await supabase.from('mc_students').update(updateData).eq('id', id);
-                    if (upError) console.error(`Erro ao atualizar aluno ${id}:`, upError);
-                }
+                const { error: upError } = await supabase.from('mc_students').upsert(toUpdate, { onConflict: 'id' });
+                if (upError) console.error(`Erro ao atualizar alunos em lote:`, upError);
             }
 
             const emusysKeys = new Set(emusysStudents.map(es => {
@@ -344,7 +354,7 @@ export const useStudents = (currentUser: Teacher | null) => {
     return {
         students, teachers, lessonHistory, loading,
         fetchInitialData, addStudent, deleteLesson,
-        resetData, addTeacher, deleteTeacher,
+        resetData, resetQuizzes, addTeacher, deleteTeacher,
         emusysSync, fileUpload
     };
 };
