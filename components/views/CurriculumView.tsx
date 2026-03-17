@@ -53,7 +53,9 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             container.style.left = '0';
             container.style.width = '800px';
             container.style.zIndex = '-1000';
-            container.style.opacity = '0';
+            container.style.opacity = '1'; // Never use 0 for html2canvas as it might skip rendering
+            container.style.pointerEvents = 'none';
+            container.style.left = '-9999px'; // Move far away instead of hiding
             container.style.backgroundColor = '#FBF6F0';
             container.style.color = '#1A110D';
             container.style.fontFamily = "'Inter', sans-serif";
@@ -69,44 +71,50 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
                 
                 <div style="padding: 60px 80px;">
                     <div style="margin-bottom: 60px;">
-                        <div style="display: inline-block; padding: 8px 20px; border: 4px solid #E87A2C; border-radius: 16px; font-weight: 900; font-size: 13px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
+                        <div style="display: inline-block; padding: 8px 18px; border: 4px solid #E87A2C; border-radius: 12px; font-weight: 900; font-size: 12px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
                             MODULO ${activeGroup.replace('_', ' ').toUpperCase()}
                         </div>
-                        <h2 style="font-size: 56px; font-weight: 950; color: #1A110D; margin: 30px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -3px;">${topic.title || 'Matéria'}</h2>
-                        <div style="margin-top: 25px; height: 8px; width: 120px; background: #E87A2C; border-radius: 4px;"></div>
+                        <h2 style="font-size: 52px; font-weight: 950; color: #1A110D; margin: 25px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -2px;">${topic.title || 'Matéria'}</h2>
+                        <div style="margin-top: 20px; height: 6px; width: 100px; background: #E87A2C;"></div>
                     </div>
                     
                     <div style="font-size: 22px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; margin-bottom: 100px; font-weight: 600;">
 ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     </div>
                     
-                    <div style="border-top: 3px solid #E87A2C22; padding-top: 50px; text-align: center;">
-                        <p style="font-size: 14px; font-weight: 900; color: #1A110D; opacity: 0.5; text-transform: uppercase; letter-spacing: 3px;">Material Pedagógico Oficial • Studio MusiClass</p>
+                    <div style="border-top: 2px solid #E87A2C33; padding-top: 50px; text-align: center;">
+                        <p style="font-size: 13px; font-weight: 900; color: #1A110D; opacity: 0.5; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
                     </div>
                 </div>
             `;
             
             document.body.appendChild(container);
             
-            // Wait for logo
+            // Wait for logo with a more aggressive failsafe
             const logo = container.querySelector('#pdf-logo') as HTMLImageElement;
             if (logo) {
                 await new Promise((resolve) => {
-                    if (logo.complete) resolve(true);
-                    logo.onload = () => resolve(true);
-                    logo.onerror = () => resolve(true);
-                    setTimeout(() => resolve(true), 1500); // Failsafe
+                    const timeout = setTimeout(() => resolve(true), 2000);
+                    if (logo.complete) { clearTimeout(timeout); resolve(true); }
+                    logo.onload = () => { clearTimeout(timeout); resolve(true); };
+                    logo.onerror = () => { clearTimeout(timeout); resolve(false); };
                 });
             }
 
-            // Small render delay
-            await new Promise(r => setTimeout(r, 500));
+            // Small delay to ensure styles are applied
+            await new Promise(r => setTimeout(r, 600));
             
             const canvas = await html2canvas(container, {
                 scale: 2,
                 backgroundColor: '#FBF6F0',
                 useCORS: true,
-                allowTaint: true
+                allowTaint: true,
+                logging: false,
+                onclone: (doc) => {
+                    // Ensure the cloned container is visible in the clone
+                    const el = doc.getElementById('pdf-logo');
+                    if (el) el.style.opacity = '1';
+                }
             });
             
             document.body.removeChild(container);

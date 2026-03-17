@@ -557,15 +557,15 @@ const App: React.FC = () => {
     <div className="fixed inset-0 bg-[#1A110D] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
       
       {/* Top Mobile Bar (Fixed at top) */}
-      <header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top w-full">
+      <header className="md:hidden flex-shrink-0 flex items-center justify-between px-4 h-14 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top w-full">
         <div className="flex items-center">
           <Logo light size="sm" />
         </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2.5 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+          className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5" />
         </button>
       </header>
 
@@ -662,7 +662,7 @@ const App: React.FC = () => {
 
       {/* Main Content Area (Scrollable independently) */}
       <main className="flex-grow flex flex-col h-full overflow-hidden relative bg-[#FBF6F0] rounded-t-[32px] md:rounded-none">
-        <div className="flex-grow overflow-y-auto px-4 pt-2 pb-8 md:p-8 lg:p-12 custom-scrollbar">
+        <div className="flex-grow overflow-y-auto px-4 pt-0 pb-8 md:p-8 lg:p-12 custom-scrollbar">
         {activeTab === 'students' && (
           <StudentsView
             teacherStudents={teacherStudents}

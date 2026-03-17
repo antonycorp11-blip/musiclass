@@ -31,7 +31,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #FBF6F0;
+            background-color: #1A110D; /* Match the dark theme base */
         }
         @keyframes customPulse {
             0%, 100% { opacity: 1; transform: scale(1); }
@@ -44,7 +44,7 @@
     <link rel="stylesheet" href="/index.css">
 </head>
 
-<body class="bg-[#FBF6F0] text-[#1A110D]">
+<body class="bg-[#1A110D] text-[#1A110D]">
     <script>
         // SCRIPT DE LIMPEZA PROFUNDA - Para resolver o problema da guia normal
         async function clearAllSystemCache() {
@@ -67,7 +67,7 @@
             }
         }
 
-        const RESET_VERSION = 'v6_force_reload';
+        const RESET_VERSION = 'v7_force_reload';
         if (localStorage.getItem('system_reset_version') !== RESET_VERSION) {
             clearAllSystemCache().then(() => {
                 localStorage.setItem('system_reset_version', RESET_VERSION);
