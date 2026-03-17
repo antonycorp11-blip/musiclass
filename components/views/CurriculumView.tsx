@@ -50,59 +50,52 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             const container = document.createElement('div');
             container.style.position = 'fixed';
             container.style.top = '0';
-            container.style.left = '0';
-            container.style.width = '800px';
-            container.style.zIndex = '-1000';
-            container.style.opacity = '1'; // Never use 0 for html2canvas as it might skip rendering
-            container.style.pointerEvents = 'none';
-            container.style.left = '-9999px'; // Move far away instead of hiding
+            container.style.left = '-9999px';
+            container.style.width = '794px'; // A4 width at 96 DPI
             container.style.backgroundColor = '#FBF6F0';
             container.style.color = '#1A110D';
             container.style.fontFamily = "'Inter', sans-serif";
             
             container.innerHTML = `
-                <div style="background: #1A110D; padding: 60px 50px; border-bottom: 12px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background: #1A110D; padding: 50px 60px; border-bottom: 15px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; flex-direction: column;">
-                         <h1 style="color: white; font-weight: 950; font-size: 42px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
-                         <p style="color: #E87A2C; font-weight: 800; font-size: 12px; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 5px;">Studio de Música & Arte</p>
+                         <h1 style="color: white; font-weight: 950; font-size: 38px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
+                         <p style="color: #E87A2C; font-weight: 800; font-size: 11px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 5px;">Studio de Música & Arte</p>
                     </div>
-                    <img src="${window.location.origin}/Logo-Laranja.png" style="height: 80px;" id="pdf-logo" />
+                    <img src="${window.location.origin}/Logo-Laranja.png" style="height: 75px;" id="pdf-logo" />
                 </div>
                 
-                <div style="padding: 60px 80px;">
-                    <div style="margin-bottom: 60px;">
-                        <div style="display: inline-block; padding: 8px 18px; border: 4px solid #E87A2C; border-radius: 12px; font-weight: 900; font-size: 12px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
+                <div style="padding: 60px 70px;">
+                    <div style="margin-bottom: 50px;">
+                        <div style="display: inline-block; padding: 6px 16px; border: 3px solid #E87A2C; border-radius: 12px; font-weight: 950; font-size: 11px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
                             MODULO ${activeGroup.replace('_', ' ').toUpperCase()}
                         </div>
-                        <h2 style="font-size: 52px; font-weight: 950; color: #1A110D; margin: 25px 0 0 0; text-transform: uppercase; line-height: 1; letter-spacing: -2px;">${topic.title || 'Matéria'}</h2>
-                        <div style="margin-top: 20px; height: 6px; width: 100px; background: #E87A2C;"></div>
+                        <h2 style="font-size: 48px; font-weight: 950; color: #1A110D; margin: 20px 0 0 0; text-transform: uppercase; line-height: 1.1; letter-spacing: -2px;">${topic.title || 'Matéria'}</h2>
                     </div>
                     
-                    <div style="font-size: 22px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; margin-bottom: 100px; font-weight: 600;">
+                    <div style="font-size: 19px; line-height: 1.7; color: #3C2415; white-space: pre-wrap; font-weight: 600; margin-bottom: 40px;" id="pdf-content-body">
 ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     </div>
                     
-                    <div style="border-top: 2px solid #E87A2C33; padding-top: 50px; text-align: center;">
-                        <p style="font-size: 13px; font-weight: 900; color: #1A110D; opacity: 0.5; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
+                    <div style="border-top: 1px solid #E87A2C44; padding-top: 40px; text-align: center; margin-top: 60px;">
+                        <p style="font-size: 12px; font-weight: 900; color: #1A110D; opacity: 0.4; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
                     </div>
                 </div>
             `;
             
             document.body.appendChild(container);
             
-            // Wait for logo with a more aggressive failsafe
             const logo = container.querySelector('#pdf-logo') as HTMLImageElement;
             if (logo) {
                 await new Promise((resolve) => {
-                    const timeout = setTimeout(() => resolve(true), 2000);
-                    if (logo.complete) { clearTimeout(timeout); resolve(true); }
-                    logo.onload = () => { clearTimeout(timeout); resolve(true); };
-                    logo.onerror = () => { clearTimeout(timeout); resolve(false); };
+                    if (logo.complete) resolve(true);
+                    logo.onload = () => resolve(true);
+                    logo.onerror = () => resolve(true);
+                    setTimeout(resolve, 1500);
                 });
             }
 
-            // Small delay to ensure styles are applied
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 800));
             
             const canvas = await html2canvas(container, {
                 scale: 2,
@@ -110,34 +103,33 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
-                onclone: (doc) => {
-                    // Ensure the cloned container is visible in the clone
-                    const el = doc.getElementById('pdf-logo');
-                    if (el) el.style.opacity = '1';
-                }
+                windowWidth: 794
             });
             
             document.body.removeChild(container);
             
-            const dataUrl = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
             
-            const imgProps = pdf.getImageProperties(dataUrl);
-            const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgActualHeight = (imgProps.height * pdfWidth) / imgProps.width;
             
-            let heightLeft = imgHeight;
+            let heightLeft = imgActualHeight;
             let position = 0;
+            const margin = 10; // Extra white space at bottom of each page to prevent cutting middle of lines
 
-            pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-            heightLeft -= pageHeight;
+            // First page
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgActualHeight, undefined, 'FAST');
+            heightLeft -= (pdfHeight - margin);
 
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
+            // Additional pages
+            while (heightLeft > 0) {
+                position = heightLeft - imgActualHeight + margin;
                 pdf.addPage();
-                pdf.addImage(dataUrl, 'PNG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-                heightLeft -= pageHeight;
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgActualHeight, undefined, 'FAST');
+                heightLeft -= (pdfHeight - margin);
             }
             
             pdf.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
@@ -257,8 +249,8 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             </div>
 
             {editingTopic && (
-                <div className="fixed inset-0 bg-[#000000]/80 backdrop-blur-sm z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-                    <div className="bg-[#FBF6F0] rounded-t-[40px] md:rounded-[48px] w-full max-w-4xl h-[92vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-500 text-[#1A110D]">
+                <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+                    <div className="bg-[#FBF6F0] rounded-t-[32px] md:rounded-[40px] w-full max-w-4xl h-[94vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-full duration-500 text-[#1A110D]">
                         <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
                             <div>
                                 <h3 className="text-xl md:text-3xl font-black tracking-tighter uppercase">{isEditable ? 'Editar' : 'Detalhes'}</h3>
