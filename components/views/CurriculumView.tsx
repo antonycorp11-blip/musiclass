@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     BookOpen, Plus, Trash2, ChevronRight, Edit3,
-    HelpCircle, CheckCircle2, Save, X, FileText, Send, Star
+    HelpCircle, CheckCircle2, Save, X, FileText, Send, Star, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { CurriculumTopic, InstrumentGroup, QuizQuestion, Teacher, Student } from '../../types';
-import { fetchCurriculumTopics, saveCurriculumTopic, getInstrumentGroup, applyTopicToStudent, fetchStudentCurriculumProgress } from '../../services/curriculumService';
+import { fetchCurriculumTopics, saveCurriculumTopic, getInstrumentGroup, applyTopicToStudent } from '../../services/curriculumService';
 import { Sparkles, User } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
@@ -26,6 +26,7 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
     const [isAiModuleOpen, setIsAiModuleOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string>("");
     const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+    const [isContentExpanded, setIsContentExpanded] = useState(false);
 
     const loadTopics = async () => {
         setLoading(true);
@@ -114,8 +115,19 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
 
             if (token) {
                 const link = `${window.location.origin}/?quiz=${token}`;
-                await navigator.clipboard.writeText(link);
-                showToast("✨ Sucesso! O link do questionário foi copiado para sua área de transferência. Agora é só colar no WhatsApp do aluno.", "success");
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast("✨ Link copiado! Cole no WhatsApp do aluno.", "success");
+                } catch (clipErr) {
+                    // Fallback para quando o navegador bloqueia clipboard (comum em Iframe ou mobile sem HTTPS)
+                    const textArea = document.createElement("textarea");
+                    textArea.value = link;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showToast("✨ Link gerado e copiado!", "success");
+                }
             } else {
                 showToast("Erro ao gerar token do quiz.", "error");
             }
@@ -242,25 +254,32 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
             {editingTopic && (
                 <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[500] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[56px] w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
-                        <header className="p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
-                            <div>
-                                <h3 className="text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-none">{currentUser.role === 'director' ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
-                                <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
+                        <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
+                            <div className="flex-1 pr-4">
+                                <h3 className="text-xl md:text-3xl font-black text-[#3C2415] tracking-tighter uppercase leading-tight">{currentUser.role === 'director' ? 'Editar Tópico' : 'Visualizar Tópico'}</h3>
+                                <p className="text-[9px] font-black text-[#E87A2C] uppercase tracking-widest mt-1 md:mt-2">{activeGroup.replace('_', ' ')} • Mês {editingTopic.month_index}</p>
                             </div>
-                            <button onClick={() => setEditingTopic(null)} className="p-4 bg-[#FBF6F0] rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setEditingTopic(null)} className="p-3 md:p-4 bg-[#FBF6F0] rounded-xl md:rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
                         </header>
 
-                        <div className="flex-grow overflow-y-auto p-10 custom-scrollbar space-y-8">
+                        <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar space-y-6 md:space-y-8">
                             {(!isEditable) ? (
                                 <>
                                     <div className="space-y-2">
-                                        <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Título da Matéria</h4>
-                                        <h2 className="text-4xl font-black text-[#3C2415] uppercase tracking-tighter leading-tight bg-[#FBF6F0] p-8 rounded-[32px]">{editingTopic.title}</h2>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Conteúdo / Resumo</h4>
-                                        <div className="bg-[#FBF6F0] p-10 rounded-[40px] text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-lg">
-                                            {editingTopic.content_text || 'Sem conteúdo cadastrado.'}
+                                        <h4 className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.2em]">Conteúdo Pedagógico</h4>
+                                        <div className="bg-[#FBF6F0] rounded-[32px] overflow-hidden border border-[#3C2415]/5">
+                                            <div className={`p-6 md:p-8 text-stone-700 font-medium leading-relaxed whitespace-pre-wrap text-base md:text-lg ${!isContentExpanded ? 'max-h-[150px] overflow-hidden relative' : ''}`}>
+                                                {editingTopic.content_text || 'Sem conteúdo cadastrado.'}
+                                                {!isContentExpanded && (
+                                                    <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#FBF6F0] to-transparent" />
+                                                )}
+                                            </div>
+                                            <button 
+                                                onClick={() => setIsContentExpanded(!isContentExpanded)}
+                                                className="w-full py-4 bg-white/50 border-t border-[#3C2415]/5 text-[10px] font-black uppercase tracking-widest text-[#E87A2C] flex items-center justify-center gap-2 hover:bg-white transition-all"
+                                            >
+                                                {isContentExpanded ? <><ChevronUp className="w-3 h-3"/> Ocultar Texto</> : <><ChevronDown className="w-3 h-3"/> Expandir Conteúdo Completo</>}
+                                            </button>
                                         </div>
                                     </div>
                                 </>
@@ -286,22 +305,22 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
 
                             {/* SEÇÃO DE AÇÃO PARA PROFESSORES */}
                             {editingTopic.id && (
-                                <div className="bg-[#E87A2C]/5 p-8 rounded-[40px] border border-[#E87A2C]/10 space-y-6">
+                                <div className="bg-[#E87A2C]/5 p-6 md:p-8 rounded-[40px] border border-[#E87A2C]/10 space-y-6">
                                     <div className="flex items-center gap-4">
                                         <div className="p-3 bg-white rounded-2xl text-[#E87A2C] shadow-sm">
                                             <User className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <h4 className="font-black text-[#3C2415] uppercase tracking-tighter">Gerar Questionário para Aluno</h4>
-                                            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">Selecione um aluno para enviar esta matéria</p>
+                                            <h4 className="font-black text-[#3C2415] uppercase tracking-tighter text-sm md:text-base">Módulo: Aplicar para Aluno</h4>
+                                            <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest">Gere o link do questionário agora</p>
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="flex flex-col gap-4">
                                         <select
                                             value={selectedStudentId}
                                             onChange={(e) => setSelectedStudentId(e.target.value)}
-                                            className="flex-grow bg-white border-none rounded-2xl p-4 font-bold text-sm shadow-sm focus:ring-2 focus:ring-[#E87A2C]"
+                                            className="w-full bg-white border-none rounded-2xl p-4 font-bold text-sm shadow-sm focus:ring-2 focus:ring-[#E87A2C]"
                                         >
                                             <option value="">Selecione o aluno...</option>
                                             {eligibleStudents.map(s => (
@@ -312,11 +331,13 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, onSelec
                                         <button
                                             onClick={handleGenerateQuizLink}
                                             disabled={!selectedStudentId || isGeneratingLink}
-                                            className="px-8 py-4 bg-[#E87A2C] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-orange-500/20 hover:scale-105 transition-all disabled:opacity-30 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                                            className="w-full py-5 bg-[#E87A2C] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-orange-500/20 hover:scale-[1.02] transition-all disabled:opacity-30 disabled:hover:scale-100 flex items-center justify-center gap-3"
                                         >
-                                            {isGeneratingLink ? 'GERANDO...' : <><Sparkles className="w-4 h-4" /> GERAR LINK E COPIAR</>}
+                                            {isGeneratingLink ? 'GERANDO...' : <><Send className="w-4 h-4" /> GERAR LINK E COPIAR LINK</>}
                                         </button>
                                     </div>
+                                </div>
+                            )}
 
                                     {eligibleStudents.length === 0 && (
                                         <p className="text-[9px] text-[#E87A2C] font-black uppercase text-center tracking-widest">Nenhum aluno de {activeGroup.replace('_', ' ')} encontrado.</p>

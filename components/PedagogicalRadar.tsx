@@ -32,8 +32,18 @@ export const PedagogicalRadar: React.FC<PedagogicalRadarProps> = ({
     const { showToast } = useToast();
     const handleCopyQuizLink = (token: string) => {
         const link = `${window.location.origin}/?quiz=${token}`;
-        navigator.clipboard.writeText(link);
-        showToast("Link do questionário copiado!", "success");
+        try {
+            navigator.clipboard.writeText(link);
+            showToast("Link do questionário copiado!", "success");
+        } catch (e) {
+            const textArea = document.createElement("textarea");
+            textArea.value = link;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showToast("Link copiado!", "success");
+        }
     };
 
     if (status === 'ok' && !idealTopic && pendingTopics.length === 0 && (appliedTopics || []).length === 0) return null;

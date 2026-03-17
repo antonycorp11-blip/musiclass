@@ -67,6 +67,7 @@ const App: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox' | 'curriculum' | 'student-center' | 'ranking'>('students');
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [isAddingTeacher, setIsAddingTeacher] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Custom Hooks
     const {
@@ -547,51 +548,109 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-x-hidden">
-      {/* Sidebar */}
-      <nav className="w-full md:w-20 lg:w-72 bg-[#1A110D] text-white p-2 md:p-4 lg:p-8 flex md:flex-col items-center lg:items-stretch fixed bottom-0 md:top-0 h-16 md:h-screen z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] md:shadow-2xl">
-        <div className="hidden md:block absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full -mr-16 -mt-16" />
+    <div className="min-h-screen bg-[#FBF6F0] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-x-hidden relative">
+      
+      {/* Top Mobile Bar */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-[#1A110D] text-white z-[100] sticky top-0 border-b border-white/5">
+        <Logo light size="sm" />
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="p-2 bg-white/10 rounded-xl"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Modern Sidebar (Overlay on Mobile, Fixed on Desktop) */}
+      <nav className={`
+        fixed inset-y-0 left-0 w-[280px] bg-[#1A110D] text-white z-[500] 
+        transform transition-all duration-500 ease-in-out
+        md:relative md:translate-x-0 md:w-20 lg:w-72
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        flex flex-col p-4 md:p-4 lg:p-8
+      `}>
+        {/* Close Button Mobile */}
+        <button 
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden absolute top-6 right-6 p-2 bg-white/5 rounded-xl hover:bg-rose-500 transition-all"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
         <div className="hidden md:block mb-12 z-10"><Logo light size="sm" /></div>
-        <div className="flex md:flex-col gap-1 md:gap-2 flex-grow justify-around md:justify-start w-full z-10">
-          <button onClick={() => setActiveTab('students')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'students' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <Users className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Alunos</span>
-          </button>
-          <button onClick={() => setActiveTab('lesson')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'lesson' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <BookOpen className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Aulas</span>
-          </button>
-          <button onClick={() => setActiveTab('history')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'history' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <Clock className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Histórico</span>
-          </button>
-          <button onClick={() => setActiveTab('toolbox')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'toolbox' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <Wrench className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Ferramentas</span>
-          </button>
-          <button onClick={() => setIsGalleryOpen(true)} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all text-stone-500 hover:text-white hover:bg-white/5`}>
-            <Layout className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Galeria</span>
-          </button>
-          <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'curriculum' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <ScrollText className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Grade Master</span>
-          </button>
+        <div className="md:hidden mb-12"><Logo light size="md" /></div>
+
+        <div className="flex flex-col gap-2 flex-grow w-full z-10">
+          <MenuButton 
+            active={activeTab === 'students'} 
+            onClick={() => { setActiveTab('students'); setIsSidebarOpen(false); }} 
+            icon={<Users className="w-5 h-5" />} 
+            label="Alunos" 
+          />
+          <MenuButton 
+            active={activeTab === 'lesson'} 
+            onClick={() => { setActiveTab('lesson'); setIsSidebarOpen(false); }} 
+            icon={<BookOpen className="w-5 h-5" />} 
+            label="Diário de Aula" 
+          />
+          <MenuButton 
+            active={activeTab === 'history'} 
+            onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }} 
+            icon={<Clock className="w-5 h-5" />} 
+            label="Histórico Geral" 
+          />
+          <MenuButton 
+            active={activeTab === 'curriculum'} 
+            onClick={() => { setActiveTab('curriculum'); setIsSidebarOpen(false); }} 
+            icon={<ScrollText className="w-5 h-5" />} 
+            label="Grade Master" 
+          />
+          <MenuButton 
+            active={activeTab === 'toolbox'} 
+            onClick={() => { setActiveTab('toolbox'); setIsSidebarOpen(false); }} 
+            icon={<Wrench className="w-5 h-5" />} 
+            label="Ferramentas" 
+          />
+          <MenuButton 
+            active={activeTab === 'ranking'} 
+            onClick={() => { setActiveTab('ranking'); setIsSidebarOpen(false); }} 
+            icon={<Trophy className="w-5 h-5" />} 
+            label="Ranking" 
+          />
+
+          <div className="my-4 border-t border-white/5" />
+
           {currentUser.role === 'director' && (
-            <>
-              <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'dashboard' ? 'bg-[#E87A2C] shadow-lg shadow-orange-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-                <LayoutDashboard className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Painel</span>
-              </button>
-            </>
+            <MenuButton 
+              active={activeTab === 'dashboard'} 
+              onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} 
+              icon={<LayoutDashboard className="w-5 h-5" />} 
+              label="Painel Diretor" 
+            />
           )}
-          <button onClick={() => setActiveTab('ranking')} className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 px-3 md:px-5 py-2 md:py-4 rounded-xl md:rounded-2xl transition-all ${activeTab === 'ranking' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20 scale-105' : 'text-stone-500 hover:text-white'}`}>
-            <Trophy className="w-5 h-5" /><span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Ranking</span>
+
+          <button onClick={() => { setIsGalleryOpen(true); setIsSidebarOpen(false); }} className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all text-stone-500 hover:text-white hover:bg-white/5`}>
+            <Layout className="w-5 h-5" /><span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Galeria Modelos</span>
           </button>
-          <button onClick={handleLogout} className="md:hidden flex flex-col items-center gap-1 px-3 py-2 text-stone-500"><LogOut className="w-5 h-5" /><span className="text-[8px] font-black uppercase tracking-widest">Sair</span></button>
         </div>
-        <div className="hidden md:block mt-auto pt-6 border-t border-white/5 w-full z-10">
-          <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-500 hover:text-white transition-all group">
-            <LogOut className="w-5 h-5 group-hover:text-rose-500 transition-colors" /><span className="lg:block md:hidden text-[10px] font-black uppercase tracking-widest">Sair do Sistema</span>
+
+        <div className="mt-auto pt-6 border-t border-white/5 w-full z-10">
+          <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
+            <LogOut className="w-5 h-5" /><span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Sair do Sistema</span>
           </button>
         </div>
       </nav>
 
+      {/* Click-away overlay for mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[400] md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <main className="flex-grow md:ml-20 lg:ml-72 p-4 md:p-12 pb-24 md:pb-0 overflow-y-auto min-h-screen">
+      <main className={`flex-grow md:ml-0 md:p-8 lg:p-12 pb-0 overflow-y-auto min-h-screen transition-all duration-300`}>
         {activeTab === 'students' && (
           <StudentsView
             teacherStudents={teacherStudents}
@@ -801,5 +860,18 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const MenuButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
+  <button 
+    onClick={onClick} 
+    className={`
+      flex items-center gap-4 px-5 py-4 rounded-2xl transition-all w-full
+      ${active ? 'bg-[#E87A2C] text-white shadow-xl shadow-orange-500/20' : 'text-stone-500 hover:text-white hover:bg-white/5'}
+    `}
+  >
+    {icon}
+    <span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">{label}</span>
+  </button>
+);
 
 export default App;
