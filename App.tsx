@@ -11,7 +11,13 @@ import {
   ScrollText,
   X,
   AlertCircle,
-  Trophy
+  Trophy,
+  Menu,
+  ChevronRight,
+  Settings,
+  Bell,
+  Search,
+  Sparkles
 } from 'lucide-react';
 
 import { Instrument, Level, Student, Teacher, LessonTemplate } from './types';
