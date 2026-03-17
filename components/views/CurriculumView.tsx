@@ -49,48 +49,75 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
         try {
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 20;
+            const contentWidth = pageWidth - (margin * 2);
+            let cursorY = 85;
             
-            // Header
-            doc.setFillColor(26, 17, 13); // Black
-            doc.rect(0, 0, pageWidth, 40, 'F');
-            
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.setFont("helvetica", "bold");
-            doc.text("MUSICLASS", 20, 20);
-            
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text("EDUCATIONAL SYSTEM", 20, 28);
-            
-            // Title
-            doc.setTextColor(232, 122, 44); // Orange
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text(activeGroup.replace('_', ' ').toUpperCase(), 20, 55);
-            
-            doc.setTextColor(60, 36, 21); // Dark Brown
-            doc.setFontSize(26);
-            doc.text(topic.title?.toUpperCase() || "MATÉRIA", 20, 65);
-            
-            // Divider
-            doc.setDrawColor(232, 122, 44);
-            doc.setLineWidth(1);
-            doc.line(20, 75, 190, 75);
+            // Function to add header to any page
+            const addHeader = (pdfDoc: jsPDF) => {
+                pdfDoc.setFillColor(26, 17, 13); // Black
+                pdfDoc.rect(0, 0, pageWidth, 40, 'F');
+                
+                pdfDoc.setTextColor(255, 255, 255);
+                pdfDoc.setFontSize(22);
+                pdfDoc.setFont("helvetica", "bold");
+                pdfDoc.text("MUSICLASS", margin, 20);
+                
+                pdfDoc.setFontSize(10);
+                pdfDoc.setFont("helvetica", "normal");
+                pdfDoc.text("EDUCATIONAL SYSTEM", margin, 28);
+                
+                // Title on first page only (if cursorY is initial)
+                if (cursorY === 85) {
+                    pdfDoc.setTextColor(232, 122, 44); // Orange
+                    pdfDoc.setFontSize(12);
+                    pdfDoc.setFont("helvetica", "bold");
+                    pdfDoc.text(activeGroup.replace('_', ' ').toUpperCase(), margin, 55);
+                    
+                    pdfDoc.setTextColor(60, 36, 21); // Dark Brown
+                    pdfDoc.setFontSize(26);
+                    pdfDoc.text(topic.title?.toUpperCase() || "MATÉRIA", margin, 65);
+                    
+                    // Divider
+                    pdfDoc.setDrawColor(232, 122, 44);
+                    pdfDoc.setLineWidth(1);
+                    pdfDoc.line(margin, 75, pageWidth - margin, 75);
+                }
+            };
+
+            const addFooter = (pdfDoc: jsPDF, pageNum: number) => {
+                pdfDoc.setFontSize(8);
+                pdfDoc.setTextColor(150, 150, 150);
+                pdfDoc.text(`Página ${pageNum} - Gerado pelo MusiClass Manager`, pageWidth / 2, pageHeight - 10, { align: "center" });
+            };
+
+            addHeader(doc);
             
             // Content
             doc.setTextColor(60, 36, 21);
             doc.setFontSize(11);
             doc.setFont("helvetica", "normal");
             
-            const splitContent = doc.splitTextToSize(topic.content_text || "Sem conteúdo cadastrado.", 170);
-            doc.text(splitContent, 20, 85);
+            const splitContent = doc.splitTextToSize(topic.content_text || "Sem conteúdo cadastrado.", contentWidth);
             
-            // Footer
-            const pageHeight = doc.internal.pageSize.getHeight();
-            doc.setFontSize(8);
-            doc.setTextColor(150, 150, 150);
-            doc.text("Gerado automaticamente pelo MusiClass Manager", pageWidth / 2, pageHeight - 10, { align: "center" });
+            let currentPage = 1;
+            splitContent.forEach((line: string) => {
+                if (cursorY > pageHeight - 25) {
+                    addFooter(doc, currentPage);
+                    doc.addPage();
+                    currentPage++;
+                    cursorY = 55; // Start lower on new pages to leave room for header
+                    addHeader(doc);
+                    doc.setTextColor(60, 36, 21);
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "normal");
+                }
+                doc.text(line, margin, cursorY);
+                cursorY += 7; // Line height
+            });
+            
+            addFooter(doc, currentPage);
             
             doc.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
             showToast("PDF Gerado!", "success");
