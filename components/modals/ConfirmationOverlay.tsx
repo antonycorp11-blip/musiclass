@@ -34,11 +34,16 @@ export const ConfirmationOverlay: React.FC<ConfirmationOverlayProps> = ({ studen
                 </div>
 
                 <button
-                    onClick={onClose}
+                    onClick={() => {
+                        onClose();
+                        window.close();
+                    }}
                     className="w-full py-5 bg-[#E87A2C] hover:bg-orange-600 text-white rounded-[24px] font-black uppercase tracking-widest transition-all shadow-xl shadow-orange-500/20"
                 >
-                    Continuar Estudando
+                    FECHAR A PÁGINA
                 </button>
+                <p className="text-stone-500 text-[9px] uppercase tracking-widest mt-4">Sua confirmação foi salva. Você já pode fechar esta tela.</p>
+
             </div>
         </div>
     );

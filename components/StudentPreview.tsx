@@ -269,35 +269,31 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
             // 1.5 Captura o ID novo ou o existente de forma segura
             const finalLessonId = currentId; // Ja atualizado pelo result.lessonId no topo
 
-            // Link de Confirmação (Mapear os 5 botões)
-            [1, 2, 3, 4, 5].forEach(num => {
-                const btn = element.querySelector(`.confirm-read-pdf-${num}`);
-                if (btn) {
-                    const rect = btn.getBoundingClientRect();
-                    const parentRect = element.getBoundingClientRect();
-                    const relTop = rect.top - parentRect.top;
-                    const relLeft = rect.left - parentRect.left;
+            // Link de Confirmação Único
+            const confirmBtn = element.querySelector('.confirm-read-pdf-main');
+            if (confirmBtn) {
+                const rect = confirmBtn.getBoundingClientRect();
+                const parentRect = element.getBoundingClientRect();
+                const relTop = rect.top - parentRect.top;
+                const relLeft = rect.left - parentRect.left;
 
-                    const pdfX = (relLeft * 210) / parentRect.width;
-                    const pdfY = (relTop * imgHeight) / parentRect.height;
-                    const pdfW = (rect.width * 210) / parentRect.width;
-                    const pdfH = (rect.height * imgHeight) / parentRect.height;
+                const pdfX = (relLeft * 210) / parentRect.width;
+                const pdfY = (relTop * imgHeight) / parentRect.height;
+                const pdfW = (rect.width * 210) / parentRect.width;
+                const pdfH = (rect.height * imgHeight) / parentRect.height;
 
-                    // IMPORTANTE: Se o lessonId mudou nesta execução, o estado ainda não reflete.
-                    // Mas como chamamos setLessonId(result.lessonId) lá em cima, o valor seguro é o que está no DOM ou no result.
-                    const baseUrl = window.location.href.split('?')[0];
-                    const fixedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-                    const confirmUrl = `${fixedBase}?confirm_read=${finalLessonId}&session=${num}&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
-                    
-                    // Adiciona o link como "textWithLink" transparente, pois muitos leitores de PDF mobile
-                    // ignora anotações (pdf.link) que não tenham texto associado.
-                    pdf.setTextColor(lessonId ? 16 : 168, lessonId ? 185 : 162, lessonId ? 129 : 158); // Cores aprox para mesclar
-                    pdf.setFontSize(16);
-                    // Centraliza o texto no botão
-                    const textWidth = pdf.getStringUnitWidth(num.toString()) * 16 / pdf.internal.scaleFactor;
-                    pdf.textWithLink(num.toString(), pdfX + (pdfW / 2) - (textWidth / 2), pdfY + (pdfH / 2) + 2, { url: confirmUrl });
-                }
-            });
+                const baseUrl = window.location.href.split('?')[0];
+                const fixedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+                const confirmUrl = `${fixedBase}?confirm_read=${finalLessonId}&session=1&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
+                
+                pdf.link(pdfX, pdfY, pdfW, pdfH, { url: confirmUrl });
+                
+                // Fallback de texto invisível (mesma cor do botão espelhado para não atrapalhar)
+                // Se o PDF reader ignorar bbox puro, ele acha isso no canto
+                pdf.setTextColor(16, 185, 129); // #10B981 (bg-emerald-500)
+                pdf.setFontSize(8);
+                pdf.textWithLink('CONFIRMAR TREINO', pdfX + 1, pdfY + 4, { url: confirmUrl });
+            }
 
             console.log('Salvando...');
             pdf.save(`${studentName} - ${instrument} - ${today}.pdf`);
@@ -456,36 +452,26 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             </section>
                         )}
 
-                        {/* Seção de Confirmação Mutupla (5 Botões) */}
-                        <div className={`p-6 rounded-[40px] border-2 flex flex-col md:flex-row items-center justify-between gap-6 group overflow-hidden relative ${lessonId ? 'bg-emerald-50 border-emerald-100' : 'bg-stone-50 border-stone-200 shadow-sm opacity-80'}`}>
+                        {/* Seção de Confirmação Simplificada */}
+                        <div className={`p-4 rounded-[24px] border flex items-center justify-between gap-4 group overflow-hidden relative ${lessonId ? 'bg-emerald-50 border-emerald-100' : 'bg-stone-50 border-stone-200 shadow-sm opacity-80'}`}>
                             <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16" />
-                            <div className="flex items-center gap-4 z-10 shrink-0">
-                                <div className={`w-14 h-14 rounded-3xl flex items-center justify-center text-white shadow-xl ${lessonId ? 'bg-emerald-500' : 'bg-stone-400'}`}>
-                                    <CheckCircle2 className="w-7 h-7" />
+                            <div className="flex items-center gap-3 z-10 shrink-0">
+                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md ${lessonId ? 'bg-emerald-500' : 'bg-stone-400'}`}>
+                                    <CheckCircle2 className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h4 className={`text-sm font-black uppercase tracking-tighter ${lessonId ? 'text-emerald-900' : 'text-stone-600'}`}>Diário de Treino</h4>
-                                    <p className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-emerald-500 transition-colors ${lessonId ? 'text-emerald-600' : 'text-stone-400'}`}>
-                                        Confirme cada vez que treinar (Max 5x)
+                                    <h4 className={`text-xs font-black uppercase tracking-tighter ${lessonId ? 'text-emerald-900' : 'text-stone-600'}`}>Diário de Treino</h4>
+                                    <p className={`text-[8px] font-bold uppercase tracking-widest ${lessonId ? 'text-emerald-600' : 'text-stone-400'}`}>
+                                        Registre sua prática agora
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex gap-2 z-10">
-                                {[1, 2, 3, 4, 5].map((num) => (
-                                    <div
-                                        key={num}
-                                        className={`confirm-read-pdf-${num} w-10 h-10 rounded-xl shadow-lg transform active:scale-95 transition-all cursor-default ${lessonId ? 'bg-white border border-emerald-200' : 'bg-stone-200'
-                                            }`}
-                                    >
-                                        <svg viewBox="0 0 40 40" className="w-full h-full">
-                                            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill={lessonId ? "#10B981" : "#A8A29E"} fontWeight="900" fontSize="16">{num}</text>
-                                        </svg>
-                                    </div>
-                                ))}
+                            <div className="flex z-10 shrink-0 pl-2">
+                                <div className={`confirm-read-pdf-main px-4 py-2.5 rounded-xl shadow-md transform active:scale-95 transition-all text-center flex items-center justify-center ${lessonId ? 'bg-emerald-500 text-white' : 'bg-stone-300 text-white'}`}>
+                                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Clique Aqui ao Estudar</span>
+                                </div>
                             </div>
-
-                            <div className="hidden confirm-read-pdf">Confirmar Leitura Geral</div>
                         </div>
 
                         <div className="flex flex-col gap-10">
