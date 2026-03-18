@@ -542,8 +542,6 @@ const App: React.FC = () => {
     );
   }
 
-  if (!currentUser) return <Login teachers={teachers} onLogin={handleLogin} />;
-
   if (quizToken) {
     return (
       <QuizPlayer
@@ -552,6 +550,22 @@ const App: React.FC = () => {
       />
     );
   }
+
+  if (confirmationScreen) {
+    return (
+      <ConfirmationOverlay
+        student={confirmationScreen.student}
+        inst={confirmationScreen.inst}
+        session={confirmationScreen.session}
+        onClose={() => {
+          setConfirmationScreen(null);
+          if (currentUser) fetchInitialData();
+        }}
+      />
+    );
+  }
+
+  if (!currentUser) return <Login teachers={teachers} onLogin={handleLogin} />;
 
   return (
     <div className="fixed inset-0 bg-[#1A110D] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
@@ -798,17 +812,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Modals & Overlays */}
-      {confirmationScreen && (
-        <ConfirmationOverlay
-          student={confirmationScreen.student}
-          inst={confirmationScreen.inst}
-          session={confirmationScreen.session}
-          onClose={() => {
-            setConfirmationScreen(null);
-            fetchInitialData();
-          }}
-        />
-      )}
+
 
       {isPreviewing && selectedStudent && (
         <StudentPreview
