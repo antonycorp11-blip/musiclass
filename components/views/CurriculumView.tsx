@@ -168,23 +168,51 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
     };
 
     const handleGenerateQuizLink = async () => {
-        if (!selectedStudentId || !editingTopic?.id) return;
+        if (!selectedStudentId || !editingTopic?.id) {
+            showToast("Selecione um aluno primeiro!", "error");
+            return;
+        }
+        
         setIsGeneratingLink(true);
         try {
+            // Garante que o tópico seja aplicado no banco e retorna o token real
             const token = await applyTopicToStudent(selectedStudentId, editingTopic.id, currentUser.id);
+            
             if (token) {
                 const link = `${window.location.origin}/?quiz=${token}`;
-                try { await navigator.clipboard.writeText(link); showToast("Link copiado!", "success"); }
-                catch (e) {
+                
+                // Tenta copiar usando o método moderno
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast("Link copiado para o WhatsApp!", "success");
+                } catch (err) {
+                    // Fallback para navegadores mobile que bloqueiam o clipboard via script
                     const textArea = document.createElement("textarea");
-                    textArea.value = link; document.body.appendChild(textArea);
-                    textArea.select(); document.execCommand('copy');
+                    textArea.value = link;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    textArea.style.top = "0";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast("Link gerado e copiado!", "success");
+                    } catch (copyErr) {
+                        console.error("Falha ao copiar:", copyErr);
+                        alert("Link gerado: " + link + "\n\nPor favor, copie manualmente.");
+                    }
                     document.body.removeChild(textArea);
-                    showToast("Link gerado!", "success");
                 }
+            } else {
+                throw new Error("Token não gerado pelo servidor.");
             }
-        } catch (e: any) { showToast("Erro: " + e.message, "error"); }
-        finally { setIsGeneratingLink(false); }
+        } catch (e: any) { 
+            console.error(e);
+            showToast("Erro ao gerar link: " + e.message, "error"); 
+        } finally { 
+            setIsGeneratingLink(false); 
+        }
     };
 
     const eligibleStudents = students.filter(s => getInstrumentGroup(s.instrument) === activeGroup);
