@@ -123,7 +123,7 @@ export const QuizPlayer: React.FC<QuizPlayerProps> = ({ token, onClose }) => {
     if (finished) {
         const passed = score >= 60;
         return (
-            <div className="min-h-screen bg-[#FBF6F0] flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
+            <div className="fixed inset-0 bg-[#FBF6F0] flex flex-col items-center overflow-y-auto p-6 md:p-12 relative pb-32">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 rounded-full -mr-48 -mt-48 animate-pulse" />
                 <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/5 rounded-full -ml-40 -mb-40" />
 
@@ -270,8 +270,8 @@ export const QuizPlayer: React.FC<QuizPlayerProps> = ({ token, onClose }) => {
     const q = topic.quiz_json[currentQuestion];
 
     return (
-        <div className="min-h-screen bg-[#FBF6F0] flex flex-col p-6 md:p-12">
-            <div className="max-w-3xl mx-auto w-full space-y-12">
+        <div className="fixed inset-0 bg-[#FBF6F0] flex flex-col overflow-y-auto scroll-smooth safe-top pb-32">
+            <div className="max-w-3xl mx-auto w-full p-6 md:p-12 space-y-12">
                 <header className="flex justify-between items-center">
                     <Logo size="xs" />
                     <div className="text-right">

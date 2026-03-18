@@ -186,7 +186,9 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             const token = await applyTopicToStudent(selectedStudentId, editingTopic.id, currentUser.id);
             
             if (token) {
-                const link = `${window.location.origin}/?quiz=${token}`;
+                const baseUrl = window.location.href.split('?')[0];
+                const fixedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+                const link = `${fixedBase}?quiz=${token}`;
                 setGeneratedLink(link);
                 showToast("Link gerado com sucesso!", "success");
             } else {
