@@ -557,25 +557,25 @@ const App: React.FC = () => {
     <div className="fixed inset-0 bg-[#1A110D] flex flex-col md:flex-row font-sans text-[#1A110D] overflow-hidden">
       
       {/* Top Mobile Bar (Fixed at top) */}
-      <header className="md:hidden flex-shrink-0 flex items-center justify-between px-4 h-14 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top w-full">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-20 bg-[#1A110D] text-white z-[100] border-b border-white/5 safe-top w-full px-6 flex items-center justify-between">
         <div className="flex items-center">
           <Logo light size="sm" />
         </div>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+          className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-6 h-6" />
         </button>
       </header>
 
       {/* Modern Sidebar (Overlay on Mobile, Fixed on Desktop) */}
       <nav className={`
-        fixed inset-y-0 left-0 w-[240px] bg-[#1A110D] text-white z-[500] 
+        fixed inset-y-0 left-0 w-[280px] bg-[#1A110D] text-white z-[500] 
         transform transition-all duration-500 ease-in-out
         md:relative md:translate-x-0 md:w-20 lg:w-72
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        flex flex-col p-4 md:p-4 lg:p-8
+        flex flex-col p-6 md:p-4 lg:p-8
       `}>
         {/* Close Button Mobile */}
         <button 
@@ -646,7 +646,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto pt-6 border-t border-white/5 w-full z-10 shrink-0">
-          <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
+          <button handleLogout={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
             <LogOut className="w-5 h-5" /><span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Sair do Sistema</span>
           </button>
         </div>
@@ -655,14 +655,14 @@ const App: React.FC = () => {
       {/* Click-away overlay for mobile sidebar */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[400] md:hidden"
+          className="fixed inset-0 bg-[#1A110D]/80 backdrop-blur-md z-[400] md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Main Content Area (Scrollable independently) */}
       <main className="flex-grow flex flex-col h-full overflow-hidden relative bg-[#FBF6F0] rounded-t-[32px] md:rounded-none">
-        <div className="flex-grow overflow-y-auto px-4 pt-0 pb-8 md:p-8 lg:p-12 custom-scrollbar">
+        <div className="flex-grow overflow-y-auto px-4 pt-24 pb-12 md:p-8 lg:p-12 custom-scrollbar">
         {activeTab === 'students' && (
           <StudentsView
             teacherStudents={teacherStudents}

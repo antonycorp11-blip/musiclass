@@ -48,37 +48,38 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
             const html2canvas = (await import('html2canvas')).default;
             
             const container = document.createElement('div');
-            container.style.position = 'fixed';
+            container.id = 'pdf-render-container';
+            container.style.position = 'absolute';
             container.style.top = '0';
-            container.style.left = '-9999px';
+            container.style.left = '-10000px'; // Far off screen but in visible DOM
             container.style.width = '794px'; // A4 width at 96 DPI
             container.style.backgroundColor = '#FBF6F0';
             container.style.color = '#1A110D';
             container.style.fontFamily = "'Inter', sans-serif";
+            container.style.visibility = 'visible';
             
             container.innerHTML = `
-                <div style="background: #1A110D; padding: 50px 60px; border-bottom: 15px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background: #1A110D; padding: 60px 60px; border-bottom: 12px solid #E87A2C; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; flex-direction: column;">
-                         <h1 style="color: white; font-weight: 950; font-size: 38px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
-                         <p style="color: #E87A2C; font-weight: 800; font-size: 11px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 5px;">Studio de Música & Arte</p>
+                         <h1 style="color: white; font-weight: 950; font-size: 40px; margin: 0; letter-spacing: -2px; line-height: 0.9;">MUSICLASS</h1>
+                         <p style="color: #E87A2C; font-weight: 800; font-size: 11px; margin: 10px 0 0 0; text-transform: uppercase; letter-spacing: 5px;">Studio de Música & Arte</p>
                     </div>
-                    <img src="${window.location.origin}/Logo-Laranja.png" style="height: 75px;" id="pdf-logo" />
+                    <img src="${window.location.origin}/Logo-Laranja.png" style="height: 70px;" id="pdf-logo" />
                 </div>
                 
-                <div style="padding: 60px 70px;">
+                <div style="padding: 60px 80px;">
                     <div style="margin-bottom: 50px;">
-                        <div style="display: inline-block; padding: 6px 16px; border: 3px solid #E87A2C; border-radius: 12px; font-weight: 950; font-size: 11px; text-transform: uppercase; color: #E87A2C; letter-spacing: 2px;">
-                            MODULO ${activeGroup.replace('_', ' ').toUpperCase()}
-                        </div>
-                        <h2 style="font-size: 48px; font-weight: 950; color: #1A110D; margin: 20px 0 0 0; text-transform: uppercase; line-height: 1.1; letter-spacing: -2px;">${topic.title || 'Matéria'}</h2>
+                        <h2 style="font-size: 12px; font-weight: 950; color: #E87A2C; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 3px;">MODULO ${activeGroup.replace('_', ' ').toUpperCase()}</h2>
+                        <h1 style="font-size: 44px; font-weight: 950; color: #1A110D; margin: 0; text-transform: uppercase; line-height: 1.1; letter-spacing: -2px;">${topic.title || 'Matéria'}</h1>
+                        <div style="margin-top: 30px; height: 6px; width: 80px; background: #E87A2C;"></div>
                     </div>
                     
-                    <div style="font-size: 19px; line-height: 1.7; color: #3C2415; white-space: pre-wrap; font-weight: 600; margin-bottom: 40px;" id="pdf-content-body">
+                    <div style="font-size: 20px; line-height: 1.8; color: #3C2415; white-space: pre-wrap; font-weight: 600;" id="pdf-body-text">
 ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     </div>
                     
-                    <div style="border-top: 1px solid #E87A2C44; padding-top: 40px; text-align: center; margin-top: 60px;">
-                        <p style="font-size: 12px; font-weight: 900; color: #1A110D; opacity: 0.4; text-transform: uppercase; letter-spacing: 2px;">Material Pedagógico Oficial • Studio MusiClass</p>
+                    <div style="margin-top: 80px; border-top: 2px solid #E87A2C22; padding-top: 40px; text-align: center;">
+                        <p style="font-size: 12px; font-weight: 900; color: #1A110D; opacity: 0.3; text-transform: uppercase; letter-spacing: 2px;">Documento Oficial MusiClass • Emitido em ${new Date().toLocaleDateString()}</p>
                     </div>
                 </div>
             `;
@@ -91,22 +92,22 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     if (logo.complete) resolve(true);
                     logo.onload = () => resolve(true);
                     logo.onerror = () => resolve(true);
-                    setTimeout(resolve, 1500);
+                    setTimeout(resolve, 2000);
                 });
             }
 
-            await new Promise(r => setTimeout(r, 800));
+            // Force browser to layout
+            container.offsetHeight; 
+            await new Promise(r => setTimeout(r, 1000));
             
             const canvas = await html2canvas(container, {
                 scale: 2,
-                backgroundColor: '#FBF6F0',
                 useCORS: true,
                 allowTaint: true,
+                backgroundColor: '#FBF6F0',
                 logging: false,
-                windowWidth: 794
+                width: 794
             });
-            
-            document.body.removeChild(container);
             
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
@@ -118,20 +119,19 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             
             let heightLeft = imgActualHeight;
             let position = 0;
-            const margin = 10; // Extra white space at bottom of each page to prevent cutting middle of lines
+            const pageMargin = 5; // Smarter margin to avoid cutting lines
 
-            // First page
             pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgActualHeight, undefined, 'FAST');
-            heightLeft -= (pdfHeight - margin);
+            heightLeft -= (pdfHeight - pageMargin);
 
-            // Additional pages
             while (heightLeft > 0) {
-                position = heightLeft - imgActualHeight + margin;
+                position = heightLeft - imgActualHeight + pageMargin;
                 pdf.addPage();
                 pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgActualHeight, undefined, 'FAST');
-                heightLeft -= (pdfHeight - margin);
+                heightLeft -= (pdfHeight - pageMargin);
             }
             
+            document.body.removeChild(container);
             pdf.save(`Materia_${topic.title?.replace(/\s+/g, '_')}.pdf`);
             showToast("PDF Gerado!", "success");
             
@@ -195,7 +195,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             {!forceGroup && (
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6 px-1 mb-8 text-[#1A110D]">
                     <div>
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">Grade Master</h2>
+                        <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase leading-none">Grade Master</h2>
                         <p className="text-stone-400 font-bold text-[10px] md:text-xs uppercase tracking-widest mt-1 md:mt-2">Biblioteca Pedagógica</p>
                     </div>
                     <button
@@ -249,8 +249,8 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             </div>
 
             {editingTopic && (
-                <div className="fixed inset-0 bg-[#1A110D]/60 backdrop-blur-md z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-                    <div className="bg-[#FBF6F0] rounded-t-[32px] md:rounded-[40px] w-full max-w-4xl h-[94vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-full duration-500 text-[#1A110D]">
+                <div className="fixed inset-0 bg-[#1A110D]/70 backdrop-blur-md z-[600] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+                    <div className="bg-[#FBF6F0] rounded-t-[32px] md:rounded-[40px] w-full max-w-4xl h-full md:h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-full duration-500 text-[#1A110D]">
                         <header className="p-6 md:p-10 border-b border-[#3C2415]/5 flex justify-between items-center shrink-0">
                             <div>
                                 <h3 className="text-xl md:text-3xl font-black tracking-tighter uppercase">{isEditable ? 'Editar' : 'Detalhes'}</h3>
