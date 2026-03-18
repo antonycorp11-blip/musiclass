@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     BookOpen, Plus, Trash2, Edit3,
-    HelpCircle, Download, X, Star, ChevronDown, ChevronUp, UserPlus
+    HelpCircle, Download, X, Star, ChevronDown, ChevronUp, UserPlus,
+    Check, Copy
 } from 'lucide-react';
 import { CurriculumTopic, InstrumentGroup, Teacher, Student } from '../../types';
 import { fetchCurriculumTopics, saveCurriculumTopic, getInstrumentGroup, applyTopicToStudent } from '../../services/curriculumService';
@@ -187,27 +188,7 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
             if (token) {
                 const link = `${window.location.origin}/?quiz=${token}`;
                 setGeneratedLink(link);
-                
-                try {
-                    await navigator.clipboard.writeText(link);
-                    showToast("Sucesso! Link copiado para o WhatsApp.", "success");
-                } catch (err) {
-                    const textArea = document.createElement("textarea");
-                    textArea.value = link;
-                    textArea.style.position = "fixed";
-                    textArea.style.left = "-9999px";
-                    textArea.style.top = "0";
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        showToast("Sucesso! Link gerado.", "success");
-                    } catch (copyErr) {
-                        console.error("Falha ao copiar:", copyErr);
-                    }
-                    document.body.removeChild(textArea);
-                }
+                showToast("Link gerado com sucesso!", "success");
             } else {
                 throw new Error("Falha ao gerar o código da aula.");
             }
@@ -350,18 +331,47 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                                 </button>
                                             </div>
                                             {generatedLink && (
-                                                <div className="bg-emerald-500/10 p-6 rounded-3xl border border-emerald-500/20 animate-in zoom-in duration-300">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Link Gerado com Sucesso:</p>
-                                                    <div className="flex items-center gap-3">
-                                                        <code className="flex-grow text-[9px] font-mono font-bold bg-white p-3 rounded-xl border border-emerald-500/10 break-all">{generatedLink}</code>
+                                                <div className="bg-white p-6 md:p-8 rounded-[32px] border-2 border-emerald-500/30 shadow-xl animate-in zoom-in duration-300">
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+                                                            <Check className="w-5 h-5 font-black" />
+                                                        </div>
+                                                        <p className="text-xs font-black uppercase tracking-widest text-[#1A110D]">Link Pronto!</p>
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-col gap-4">
+                                                        <code className="text-[10px] font-mono font-black bg-[#FBF6F0] p-4 rounded-2xl border border-stone-100 break-all text-stone-600 block shadow-inner">
+                                                            {generatedLink}
+                                                        </code>
+                                                        
                                                         <button 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(generatedLink);
-                                                                showToast("Copiado!", "success");
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await navigator.clipboard.writeText(generatedLink);
+                                                                    showToast("Copiado com sucesso!", "success");
+                                                                } catch (err) {
+                                                                    const textArea = document.createElement("textarea");
+                                                                    textArea.value = generatedLink;
+                                                                    textArea.style.position = "fixed";
+                                                                    textArea.style.left = "-9999px";
+                                                                    document.body.appendChild(textArea);
+                                                                    textArea.focus();
+                                                                    textArea.select();
+                                                                    document.execCommand('copy');
+                                                                    document.body.removeChild(textArea);
+                                                                    showToast("Link copiado!", "success");
+                                                                }
                                                             }}
-                                                            className="p-3 bg-emerald-500 text-white rounded-xl shadow-lg hover:scale-105 transition-transform"
+                                                            className="w-full py-5 bg-[#1A110D] text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 active:scale-95"
                                                         >
-                                                            <Plus className="w-5 h-5 rotate-45" /> {/* Use X or check, or just copy icon */}
+                                                            <Copy className="w-5 h-5" /> COPIAR LINK AGORA
+                                                        </button>
+                                                        
+                                                        <button 
+                                                            onClick={() => setGeneratedLink(null)} 
+                                                            className="text-[9px] font-black uppercase tracking-widest text-stone-300 hover:text-rose-500 py-2 transition-colors"
+                                                        >
+                                                            Gerar para outro aluno
                                                         </button>
                                                     </div>
                                                 </div>
