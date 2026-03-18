@@ -257,8 +257,13 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                 const pdfY = (relTop * imgHeight) / parentRect.height;
                 const pdfW = (rect.width * 210) / parentRect.width;
                 const pdfH = (rect.height * imgHeight) / parentRect.height;
-
                 pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
+                
+                // Fallback de texto invisível (mesma cor do fundo principal para não destoar)
+                // Aumenta muito as chances do leitor de PDF do iOS/WhatsApp achar o link.
+                pdf.setTextColor(26, 17, 13); // #1A110D (fundo escuro onde o áudio fica)
+                pdf.setFontSize(8);
+                pdf.textWithLink('Ouvir', pdfX + 2, pdfY + 6, { url });
             });
 
             // 1.5 Captura o ID novo ou o existente de forma segura
@@ -280,8 +285,17 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
                     // IMPORTANTE: Se o lessonId mudou nesta execução, o estado ainda não reflete.
                     // Mas como chamamos setLessonId(result.lessonId) lá em cima, o valor seguro é o que está no DOM ou no result.
-                    const confirmUrl = `${window.location.origin}${window.location.pathname}?confirm_read=${finalLessonId}&session=${num}&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
-                    pdf.link(pdfX, pdfY, pdfW, pdfH, { url: confirmUrl });
+                    const baseUrl = window.location.href.split('?')[0];
+                    const fixedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+                    const confirmUrl = `${fixedBase}?confirm_read=${finalLessonId}&session=${num}&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
+                    
+                    // Adiciona o link como "textWithLink" transparente, pois muitos leitores de PDF mobile
+                    // ignora anotações (pdf.link) que não tenham texto associado.
+                    pdf.setTextColor(lessonId ? 16 : 168, lessonId ? 185 : 162, lessonId ? 129 : 158); // Cores aprox para mesclar
+                    pdf.setFontSize(16);
+                    // Centraliza o texto no botão
+                    const textWidth = pdf.getStringUnitWidth(num.toString()) * 16 / pdf.internal.scaleFactor;
+                    pdf.textWithLink(num.toString(), pdfX + (pdfW / 2) - (textWidth / 2), pdfY + (pdfH / 2) + 2, { url: confirmUrl });
                 }
             });
 
