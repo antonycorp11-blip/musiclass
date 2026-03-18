@@ -646,7 +646,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto pt-6 border-t border-white/5 w-full z-10 shrink-0">
-          <button handleLogout={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
+          <button onClick={handleLogout} className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-stone-300 hover:text-white transition-all group hover:bg-rose-500/10 hover:text-rose-400">
             <LogOut className="w-5 h-5" /><span className="text-[10px] font-black uppercase tracking-widest md:hidden lg:block">Sair do Sistema</span>
           </button>
         </div>

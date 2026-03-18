@@ -23,9 +23,10 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
     const [topics, setTopics] = useState<CurriculumTopic[]>([]);
     const [editingTopic, setEditingTopic] = useState<Partial<CurriculumTopic> | null>(null);
     const [loading, setLoading] = useState(false);
-    const [selectedStudentId, setSelectedStudentId] = useState<string>("");
-    const [isGeneratingLink, setIsGeneratingLink] = useState(false);
     const [isContentExpanded, setIsContentExpanded] = useState(false);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+    const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
     const loadTopics = async () => {
         setLoading(true);
@@ -42,6 +43,11 @@ export const CurriculumView: React.FC<Props> = ({ currentUser, students, forceGr
     useEffect(() => {
         loadTopics();
     }, [activeGroup]);
+
+    useEffect(() => {
+        setGeneratedLink(null);
+        setSelectedStudentId('');
+    }, [editingTopic?.id]);
 
     const handleDownloadPDF = async (topic: Partial<CurriculumTopic>) => {
         try {
@@ -174,19 +180,18 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
         }
         
         setIsGeneratingLink(true);
+        setGeneratedLink(null);
         try {
-            // Garante que o tópico seja aplicado no banco e retorna o token real
             const token = await applyTopicToStudent(selectedStudentId, editingTopic.id, currentUser.id);
             
             if (token) {
                 const link = `${window.location.origin}/?quiz=${token}`;
+                setGeneratedLink(link);
                 
-                // Tenta copiar usando o método moderno
                 try {
                     await navigator.clipboard.writeText(link);
-                    showToast("Link copiado para o WhatsApp!", "success");
+                    showToast("Sucesso! Link copiado para o WhatsApp.", "success");
                 } catch (err) {
-                    // Fallback para navegadores mobile que bloqueiam o clipboard via script
                     const textArea = document.createElement("textarea");
                     textArea.value = link;
                     textArea.style.position = "fixed";
@@ -197,15 +202,14 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                     textArea.select();
                     try {
                         document.execCommand('copy');
-                        showToast("Link gerado e copiado!", "success");
+                        showToast("Sucesso! Link gerado.", "success");
                     } catch (copyErr) {
                         console.error("Falha ao copiar:", copyErr);
-                        alert("Link gerado: " + link + "\n\nPor favor, copie manualmente.");
                     }
                     document.body.removeChild(textArea);
                 }
             } else {
-                throw new Error("Token não gerado pelo servidor.");
+                throw new Error("Falha ao gerar o código da aula.");
             }
         } catch (e: any) { 
             console.error(e);
@@ -345,6 +349,23 @@ ${topic.content_text || 'Sem conteúdo cadastrado.'}
                                                     {isGeneratingLink ? 'AGUARDE...' : 'GERAR E COPIAR'}
                                                 </button>
                                             </div>
+                                            {generatedLink && (
+                                                <div className="bg-emerald-500/10 p-6 rounded-3xl border border-emerald-500/20 animate-in zoom-in duration-300">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Link Gerado com Sucesso:</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <code className="flex-grow text-[9px] font-mono font-bold bg-white p-3 rounded-xl border border-emerald-500/10 break-all">{generatedLink}</code>
+                                                        <button 
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(generatedLink);
+                                                                showToast("Copiado!", "success");
+                                                            }}
+                                                            className="p-3 bg-emerald-500 text-white rounded-xl shadow-lg hover:scale-105 transition-transform"
+                                                        >
+                                                            <Plus className="w-5 h-5 rotate-45" /> {/* Use X or check, or just copy icon */}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
