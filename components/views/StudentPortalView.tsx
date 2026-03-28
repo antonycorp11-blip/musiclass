@@ -421,38 +421,51 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                             </section>
 
                             {/* Próximos Passos (Curriculum) - Estilo Map/Jornada */}
-                            {curriculumInfo && (curriculumInfo.idealTopic || curriculumInfo.status !== 'ok') && (
-                                <section className="space-y-6">
+                            {curriculumInfo && (
+                                <section className="space-y-10">
                                     <div className="flex items-center justify-between px-2">
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
-                                            <Map className="w-4 h-4" /> Jornada Pedagógica
+                                        <h3 className="text-xl font-black uppercase tracking-tighter text-white flex items-center gap-3">
+                                            <Map className="w-6 h-6 text-[#E87A2C]" /> Jornada de Matérias
                                         </h3>
-                                        <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-3 py-1 rounded-full bg-[#E87A2C]/5">Nível {student.level || 'I'}</span>
+                                        <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-4 py-2 rounded-full bg-[#E87A2C]/5">Nível {student?.level || 'I'}</span>
                                     </div>
                                     
-                                    <div className="bg-[#1A110D] border border-white/5 rounded-[40px] p-2">
-                                         <div className="bg-white/5 rounded-[38px] p-6 space-y-4">
-                                             {curriculumInfo.idealTopic && (
-                                                 <div className="relative p-6 bg-gradient-to-br from-[#E87A2C] to-orange-600 rounded-3xl shadow-xl group">
-                                                     <Star className="absolute top-4 right-4 w-12 h-12 text-white/20 group-hover:rotate-12 transition-transform" />
-                                                     <p className="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1">Próxima Conquista</p>
-                                                     <h4 className="text-xl font-black text-white uppercase tracking-tight">{curriculumInfo.idealTopic.title}</h4>
-                                                     <p className="text-[10px] font-medium text-white/80 mt-2 line-clamp-2">{curriculumInfo.idealTopic.content_text || 'Matéria teórica e prática em destaque.'}</p>
-                                                 </div>
-                                             )}
-                                             
-                                             <div className="grid grid-cols-1 gap-2">
-                                                 {curriculumInfo.pendingTopics?.slice(0, 3).map((t: any) => (
-                                                     <div key={t.id} className="p-4 bg-white/5 rounded-2xl flex items-center justify-between border border-white/5">
-                                                         <div className="flex items-center gap-3">
-                                                             <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/40 text-[10px] font-black">M{t.month_index}</div>
-                                                             <span className="text-[10px] font-black uppercase text-white/40">{t.title}</span>
-                                                         </div>
-                                                         <ChevronRight className="w-4 h-4 text-white/10" />
-                                                     </div>
-                                                 ))}
-                                             </div>
-                                         </div>
+                                    <div className="space-y-4">
+                                        {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any) => {
+                                            const isPending = curriculumInfo.pendingTopics?.some((pt: any) => pt.id === t.id);
+                                            const title = t.title || 'Matéria sem título';
+                                            
+                                            return (
+                                                <button 
+                                                    key={t.id}
+                                                    onClick={() => setSelectedLesson({
+                                                        id: t.id,
+                                                        student_id: studentId,
+                                                        lesson_date: new Date().toISOString(),
+                                                        objective: title,
+                                                        report_data: {
+                                                            tabs: [{ title: 'Conteúdo Pedagógico', content: t.content_text || 'Em breve...' }]
+                                                        }
+                                                    } as any)}
+                                                    className={`w-full p-8 rounded-[40px] border transition-all text-left flex items-center justify-between group active:scale-[0.98] ${!isPending ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}
+                                                >
+                                                    <div className="flex items-center gap-6">
+                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-xs ${!isPending ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-rose-500 shadow-lg shadow-rose-500/20'}`}>
+                                                            M{t.month_index}
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${!isPending ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                                {!isPending ? 'Concluído' : 'Matéria Pendente'}
+                                                            </p>
+                                                            <h4 className="text-lg font-black text-white uppercase tracking-tight line-clamp-1">{title}</h4>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${!isPending ? 'border-emerald-500/20 text-emerald-500' : 'border-rose-500/20 text-rose-500'}`}>
+                                                        <ChevronRight className="w-5 h-5" />
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             )}

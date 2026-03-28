@@ -148,7 +148,27 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
         try {
             if (onSendToPortal) {
                 await onSendToPortal();
-                showToast("Aula enviada para o portal do aluno!", "success");
+                
+                // Disparar Notificação Push via Supabase Edge Function
+                try {
+                    await fetch('https://wayigtlilhvutbfvxgae.supabase.co/functions/v1/send-push-notifications', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer sb_publishable_YP9wwSLwb5yIl6mX9ebAmg_IB3xDd4L'
+                        },
+                        body: JSON.stringify({
+                            type: 'new_lesson',
+                            studentId: selectedStudent.id,
+                            title: 'Nova Aula Disponível! 🎸',
+                            body: `Sua nova ficha de estudos já está no portal. Confira o que o professor preparou!`
+                        })
+                    });
+                } catch (pushErr) {
+                    console.error("Erro ao disparar notificação push:", pushErr);
+                }
+
+                showToast("Ficha enviada ao portal e aluno notificado!", "success");
             } else {
                 // Fallback direct save if context doesn't provide it
                 onGenerateReport(); // PDF fallback
