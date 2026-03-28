@@ -34,7 +34,19 @@ import { Instrument } from '../../types';
 import { calculatePedagogicalRadar, fetchCurriculumTopics, fetchStudentCurriculumProgress, getInstrumentGroup } from '../../services/curriculumService';
 import { Toolbox } from '../Toolbox';
 import { PdfIconBox } from '../PdfUtils';
-import { Palette, Activity } from 'lucide-react';
+import { Palette, Activity, ChevronLeft, Send, Headphones } from 'lucide-react';
+
+// Service para notificações (Courier)
+const sendCourierNotification = async (studentName: string, studentId: string, type: 'lesson' | 'reminder') => {
+    try {
+        // O usuário mencionou 'conorg' ou algo assim, provavelmente Courier (courier.com)
+        // Como não temos a API KEY configurada em segredo, deixamos a estrutura pronta
+        console.log(`[Courier] Enviando notificação ${type} para ${studentName}`);
+        // await fetch('https://api.courier.com/send', { ... });
+    } catch (e) {
+        console.error("Erro ao enviar notificação", e);
+    }
+};
 
 
 interface Props {
@@ -50,12 +62,44 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
     const [isStudying, setIsStudying] = useState(false);
     const [studyTime, setStudyTime] = useState(0);
     const [activeTab, setActiveTab] = useState<'home' | 'ranking_students' | 'ranking_teachers' | 'curriculum' | 'tools' | 'settings'>('home');
+    const [studyHistory, setStudyHistory] = useState<Record<string, number>>({}); // { '2023-10-27': 45 }
     const [progressToday, setProgressToday] = useState<{ minutes: number, done: boolean }>({ minutes: 0, done: false });
     const [history, setHistory] = useState<LessonHistory[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [curriculumInfo, setCurriculumInfo] = useState<any>(null);
     const [showFullHistory, setShowFullHistory] = useState(false);
     const [selectedLesson, setSelectedLesson] = useState<LessonHistory | null>(null);
+
+    // Push Subscription Logic
+    const subscribeToPush = async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            showToast("Seu navegador não suporta notificações natias.", "error");
+            return;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('SW Registered:', registration);
+
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: 'x1ZC1S07UyncvXoUleJTlmMMgVVeT0J/nnDfKnILQiM='
+            });
+
+            // Salvar no Supabase
+            const { error } = await supabase.from('push_subscriptions').upsert({
+                student_id: studentId,
+                subscription_json: subscription,
+                alias: `${navigator.platform} - ${new Date().toLocaleDateString()}`
+            });
+
+            if (error) throw error;
+            showToast("Notificações ativadas com sucesso!", "success");
+        } catch (e) {
+            console.error("Erro ao assinar push:", e);
+            showToast("Erro ao ativar notificações. Verifique as permissões.", "error");
+        }
+    };
 
     useEffect(() => {
         const fetchStudentData = async () => {
@@ -137,25 +181,29 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
         setIsStudying(false);
         const minutes = Math.ceil(studyTime / 60);
         
-        if (minutes < 1 && studyTime > 10) { // Pequena margem para testes
+        if (minutes < 1 && studyTime > 10) {
              showToast("Sessão muito curta para registrar pontos.", "info");
              setStudyTime(0);
              return;
         }
 
         try {
+            const today = new Date().toISOString().split('T')[0];
+            const currentDayMinutes = (studyHistory[today] || 0) + minutes;
             const newPoints = (student?.points || 0) + (minutes * 2);
+            
             await supabase.from('mc_students').update({ 
                 points: newPoints,
-                last_study_date: new Date().toISOString().split('T')[0],
-                last_study_minutes: minutes
+                last_study_date: today,
+                last_study_minutes: currentDayMinutes
             }).eq('id', studentId);
             
-            setProgressToday({ minutes, done: true });
+            setStudyHistory(prev => ({ ...prev, [today]: currentDayMinutes }));
+            setProgressToday({ minutes: currentDayMinutes, done: true });
             showToast(`Treino concluído! +${minutes * 2} XP ganhos.`, "success");
             setStudyTime(0);
             setStudent(prev => prev ? { ...prev, points: newPoints } : null);
-            setSelectedLesson(null); // Fecha o modal ao finalizar se estiver nele
+            setSelectedLesson(null);
         } catch (e) {
             showToast("Erro ao salvar progresso.", "error");
         }
@@ -167,7 +215,16 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
         switch (activeTab) {
             case 'ranking_students':
                 return (
-                    <div className="pt-10">
+                    <div className="pt-10 space-y-8">
+                         <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-yellow-500 rounded-2xl flex items-center justify-center text-white">
+                                 <Trophy className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h2 className="text-xl font-black uppercase tracking-tighter">Ranking de Alunos</h2>
+                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Os melhores da semana</p>
+                             </div>
+                         </div>
                         <StudentRankingView students={allStudents} />
                     </div>
                 );
@@ -197,8 +254,8 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                      <BookOpen className="w-5 h-5 text-white/10" />
                                  </div>
                                  <h3 className="text-lg font-black text-white uppercase">{t.title}</h3>
-                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                                     <p className="text-xs text-white/60 leading-relaxed">{t.content_text || 'Conteúdo teórico em desenvolvimento para este tópico.'}</p>
+                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5 whitespace-pre-wrap leading-relaxed text-sm text-white/80">
+                                     {t.content_text || 'Conteúdo teórico em desenvolvimento para este tópico.'}
                                  </div>
                              </div>
                          ))}
@@ -221,8 +278,52 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                 );
             case 'home':
             default:
+                const weekdays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                const now = new Date();
+                const currentMonthDay = now.getDate();
+                
                 return (
                     <>
+                        {/* Header de Boas Vindas */}
+                        <div className="mb-10 animate-fade-in">
+                            <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">Olá, {student?.name?.split(' ')[0]}!</h2>
+                            <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-[0.4em] mt-3">Sua jornada musical continua aqui</p>
+                        </div>
+
+                        {/* Tracker Semanal */}
+                        <section className="bg-white/5 border border-white/10 rounded-[32px] p-6 mb-10">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <Clock className="w-3 h-3 text-[#E87A2C]" /> Registro Semanal
+                                </h4>
+                                <span className="text-[10px] font-bold text-white/20 uppercase">Semana Atual</span>
+                            </div>
+                            <div className="grid grid-cols-7 gap-2">
+                                {weekdays.map((day, i) => {
+                                    // Cálculo simplificado de data para a semana atual
+                                    const d = new Date();
+                                    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1; // 0=Seg, 6=Dom
+                                    const diff = i - dayOfWeek;
+                                    const targetDate = new Date(d.setDate(d.getDate() + diff)).toISOString().split('T')[0];
+                                    const studiedMinutes = studyHistory[targetDate] || 0;
+                                    const isToday = i === dayOfWeek;
+
+                                    return (
+                                        <div key={day} className="flex flex-col items-center gap-2">
+                                            <div className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center border transition-all ${studiedMinutes > 0 ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                                                {studiedMinutes > 0 ? (
+                                                    <span className="text-[10px] font-black text-white uppercase">{studiedMinutes}m</span>
+                                                ) : (
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500/20" />
+                                                )}
+                                            </div>
+                                            <span className={`text-[8px] font-black uppercase ${isToday ? 'text-[#E87A2C]' : 'text-white/20'}`}>{day}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
                         {/* Conteúdo Principal (Aba Home) */}
                         <div className="space-y-10 pb-20">
                             {/* Card de Aula em Destaque (Estilo Netflix/Apple) */}
@@ -396,6 +497,38 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                         </div>
                     </>
                 );
+            case 'settings':
+                return (
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-[#E87A2C]">
+                                <Settings className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black uppercase tracking-tighter">Configurações</h2>
+                                <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">Personalize sua experiência</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 rounded-[32px] p-8 border border-white/5 shadow-xl">
+                            <h4 className="text-sm font-black text-white mb-4 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-[#E87A2C]" />
+                                Notificações Nativas
+                            </h4>
+                            <p className="text-xs text-white/40 mb-8 leading-relaxed">
+                                Receba lembretes de treino diretamente no seu celular às 07:00 e 19:00. 
+                                <span className="block mt-2 text-[#E87A2C]/60 italic">* Requer que o App esteja "Adicionado à Tela de Início" no iOS.</span>
+                            </p>
+                            <button 
+                                onClick={subscribeToPush}
+                                className="w-full bg-[#E87A2C] text-white py-6 rounded-[28px] font-black text-xs uppercase tracking-[0.2em] active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg shadow-orange-500/20"
+                            >
+                                <Activity className="w-4 h-4" />
+                                ATIVAR LEMBRETES DE TREINO
+                            </button>
+                        </div>
+                    </div>
+                );
         }
     };
 
@@ -503,77 +636,135 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                              </section>
                          )}
 
-                         {/* Solos e Melodias */}
-                         {selectedLesson.report_data?.solos?.length > 0 && (
-                             <section className="space-y-6">
-                                 <div className="flex items-center justify-between">
-                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Solos e Melodias</h4>
-                                     <Music className="w-5 h-5 text-white/20" />
-                                 </div>
-                                 <div className="space-y-6">
-                                     {selectedLesson.report_data.solos.map((solo: any, i: number) => (
-                                         <div key={i} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
-                                             <p className="font-black text-[10px] uppercase text-[#E87A2C] mb-6 tracking-widest">{solo.title || `Melodia ${i + 1}`}</p>
-                                             <div className="flex flex-wrap gap-4">
-                                                 {(() => {
-                                                     const maxPos = Math.max(...(solo.notes || []).map((n: any) => n.position || 0), 0);
-                                                     const steps = Array.from({ length: maxPos + 1 });
-                                                     return steps.map((_, stepIdx) => {
-                                                         const harmonyNotes = (solo.notes || []).filter((n: any) => n.type === 'harmony' && (n.position || 0) === stepIdx);
-                                                         const soloNotes = (solo.notes || []).filter((n: any) => n.type === 'solo' && (n.position || 0) === stepIdx);
-                                                         if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
-                                                         return (
-                                                             <div key={stepIdx} className="flex flex-col gap-2 min-w-[60px] bg-white/5 p-3 rounded-2xl border border-white/10">
-                                                                 <div className="flex flex-wrap gap-1 min-h-[24px]">
-                                                                     {harmonyNotes.map((n: any, idx: number) => (
-                                                                         <PdfIconBox key={idx} text={n.note} bgColor="bg-rose-600" />
-                                                                     ))}
-                                                                 </div>
-                                                                 <div className="h-px bg-white/10 w-full" />
-                                                                 <div className="flex flex-wrap gap-1 min-h-[24px]">
-                                                                     {soloNotes.map((n: any, idx: number) => (
-                                                                         <PdfIconBox key={idx} text={n.note} bgColor="bg-blue-600" />
-                                                                     ))}
-                                                                 </div>
-                                                             </div>
-                                                         );
-                                                     });
-                                                 })()}
-                                             </div>
-                                         </div>
-                                     ))}
-                                 </div>
-                             </section>
+                          {/* Solos e Melodias */}
+                          {selectedLesson.report_data?.solos?.length > 0 && (
+                              <section className="space-y-6">
+                                  <div className="flex items-center justify-between">
+                                      <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Solos e Melodias</h4>
+                                      <Music className="w-5 h-5 text-white/20" />
+                                  </div>
+                                  <div className="space-y-6">
+                                      {selectedLesson.report_data.solos.map((solo: any, i: number) => (
+                                          <div key={i} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                              <p className="font-black text-[10px] uppercase text-[#E87A2C] mb-6 tracking-widest">{solo.title || `Melodia ${i + 1}`}</p>
+                                              <div className="flex flex-wrap gap-4">
+                                                  {(() => {
+                                                      const maxPos = Math.max(...(solo.notes || []).map((n: any) => n.position || 0), 0);
+                                                      const steps = Array.from({ length: maxPos + 1 });
+                                                      return steps.map((_, stepIdx) => {
+                                                          const harmonyNotes = (solo.notes || []).filter((n: any) => n.type === 'harmony' && (n.position || 0) === stepIdx);
+                                                          const soloNotes = (solo.notes || []).filter((n: any) => n.type === 'solo' && (n.position || 0) === stepIdx);
+                                                          if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
+                                                          return (
+                                                              <div key={stepIdx} className="flex flex-col gap-2 min-w-[60px] bg-white/5 p-3 rounded-2xl border border-white/10">
+                                                                  <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                      {harmonyNotes.map((n: any, idx: number) => (
+                                                                          <PdfIconBox key={idx} text={n.note} bgColor="bg-rose-600" />
+                                                                      ))}
+                                                                  </div>
+                                                                  <div className="h-px bg-white/10 w-full" />
+                                                                  <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                      {soloNotes.map((n: any, idx: number) => (
+                                                                          <PdfIconBox key={idx} text={n.note} bgColor="bg-blue-600" />
+                                                                      ))}
+                                                                  </div>
+                                                              </div>
+                                                          );
+                                                      });
+                                                  })()}
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </section>
+                          )}
+
+
+
+                         {/* Seção Exclusiva de Bateria (Se houver ritmos/rudimentos) */}
+                         {selectedLesson.report_data?.drums && (
+                            <section className="space-y-8">
+                                <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Estudo de Bateria</h4>
+                                     <Activity className="w-5 h-5 text-white/20" />
+                                </div>
+                                
+                                {selectedLesson.report_data.drums.rhythms?.map((r: any, rIdx: number) => (
+                                    <div key={rIdx} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                        <p className="text-[10px] font-black text-white/40 uppercase mb-4">{r.title}</p>
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {r.sequence?.map((parts: string[], sIdx: number) => (
+                                                <div key={sIdx} className={`min-w-[40px] h-20 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 ${sIdx % 4 === 0 ? 'bg-white/5' : ''}`}>
+                                                    {parts.map(p => (
+                                                        <div key={p} className="w-4 h-4 rounded-md bg-[#E87A2C] flex items-center justify-center text-[8px] text-white font-black">
+                                                            {p === 'kick' ? '🥁' : p === 'snare' ? '⊚' : '×'}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </section>
                          )}
 
-                         <div className="py-10 text-center opacity-20">
-                             <p className="text-[10px] font-black uppercase tracking-[0.4em]">MusiClass Digital Ecosystem</p>
-                         </div>
-                    </div>
-
-                    {/* Footer fixo do Modal */}
-                    <div className="p-6 bg-[#1A110D] border-t border-white/10 space-y-4">
-                         {isStudying && (
-                             <div className="bg-[#E87A2C]/10 rounded-2xl p-4 border border-[#E87A2C]/20 flex items-center justify-between">
-                                 <div>
-                                     <p className="text-[10px] font-black text-[#E87A2C] uppercase">Tempo de Treino</p>
-                                     <p className="text-xl font-black text-white">{formatTime(studyTime)}</p>
-                                 </div>
-                                 <button 
-                                    onClick={handleFinishStudy}
-                                    className="bg-[#E87A2C] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                                 >
-                                    FINALIZAR ESTUDOS
-                                 </button>
-                             </div>
+                         {/* Guias de Áudio (Vocal / Referência) */}
+                         {selectedLesson.report_data?.recordings?.length > 0 && (
+                            <section className="space-y-6">
+                                <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#A855F7]">Guias e Áudios</h4>
+                                     <Headphones className="w-5 h-5 text-white/20" />
+                                </div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {selectedLesson.report_data.recordings.map((rec: any) => (
+                                        <div 
+                                            key={rec.id}
+                                            onClick={() => {
+                                                const a = new Audio(rec.url);
+                                                a.play();
+                                            }}
+                                            className="bg-white/5 p-5 rounded-[24px] border border-white/10 flex items-center justify-between group active:scale-[0.98] transition-all cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-[#A855F7] rounded-2xl flex items-center justify-center text-white">
+                                                    <Play className="w-5 h-5 fill-current" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-black uppercase text-white">{rec.title || 'Guia de Treino'}</p>
+                                                    <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest mt-1">Toque para ouvir</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
                          )}
-                         <button 
-                            onClick={() => setSelectedLesson(null)}
-                            className="w-full bg-white/5 text-white/40 py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] active:scale-[0.98] transition-all border border-white/5"
-                         >
-                            FECHAR FICHA
-                         </button>
-                    </div>
+
+                     </div>
+
+                     {/* Footer fixo do Modal */}
+                     <div className="p-6 bg-[#1A110D] border-t border-white/10 space-y-4">
+                          {isStudying && (
+                              <div className="bg-[#E87A2C]/10 rounded-2xl p-4 border border-[#E87A2C]/20 flex items-center justify-between">
+                                  <div>
+                                      <p className="text-[10px] font-black text-[#E87A2C] uppercase">Tempo de Treino</p>
+                                      <p className="text-xl font-black text-white">{formatTime(studyTime)}</p>
+                                  </div>
+                                  <button 
+                                     onClick={handleFinishStudy}
+                                     className="bg-[#E87A2C] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest"
+                                  >
+                                     FINALIZAR ESTUDOS
+                                  </button>
+                              </div>
+                          )}
+                          <button 
+                             onClick={() => setSelectedLesson(null)}
+                             className="w-full bg-white/5 text-white/40 py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] active:scale-[0.98] transition-all border border-white/5"
+                          >
+                             FECHAR FICHA
+                          </button>
+                     </div>
                 </div>
             )}
 
@@ -604,10 +795,16 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                   <Trophy className="w-6 h-6" />
                 </button>
                 <button 
-                  onClick={() => setActiveTab('ranking_teachers')}
-                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'ranking_teachers' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
+                   onClick={() => setActiveTab('ranking_teachers')}
+                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'ranking_teachers' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
                 >
-                  <Sparkles className="w-6 h-6" />
+                  <Trophy className="w-6 h-6" />
+                </button>
+                <button 
+                  onClick={() => setActiveTab('settings')}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'settings' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
+                >
+                  <Settings className="w-6 h-6" />
                 </button>
             </nav>
         </div>

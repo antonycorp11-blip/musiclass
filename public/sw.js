@@ -1,23 +1,41 @@
-const CACHE_NAME = 'musiclass-v6-exterminator';
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body || 'Bora treinar hoje?',
+      icon: '/student_portal_icon.png', // O ícone que geramos anteriormente
+      badge: '/student_portal_icon.png',
+      vibrate: [100, 50, 100],
+      data: {
+        url: data.url || '/'
+      }
+    };
 
-self.addEventListener('install', (event) => {
-    self.skipWaiting(); // Força o novo SW a assumir imediatamente
-});
-
-self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    console.log('Deletando cache antigo:', cacheName);
-                    return caches.delete(cacheName);
-                })
-            );
-        }).then(() => self.clients.claim()) // Assume controle das abas abertas imediatamente
+      self.registration.showNotification(data.title || 'MusiClass Portal', options)
     );
+  } catch (e) {
+    console.error('Erro ao processar notificação push:', e);
+  }
 });
 
-self.addEventListener('fetch', (event) => {
-    // Modo transparente: Não intercepta nada, deixa passar para a rede
-    return;
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data.url;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });

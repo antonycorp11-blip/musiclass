@@ -2,7 +2,7 @@
 import React from 'react';
 import {
     Zap, Settings2, MousePointer2, Trash2, Layout, X,
-    ListTodo, Plus, Music, PlusCircle, Disc, Sparkles, Upload, ScrollText, ClipboardList, Check
+    ListTodo, Plus, Music, PlusCircle, Disc, Sparkles, Upload, ScrollText, ClipboardList, Check, Send
 } from 'lucide-react';
 import { Instrument, Student, Teacher } from '../../types';
 import { ROOTS, CHORD_TYPES, SCALES } from '../../constants';
@@ -80,6 +80,7 @@ interface LessonEditorViewProps {
     onToggleGallery: () => void;
     onToggleCurriculum: () => void;
     onAudioUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onSendToPortal?: () => Promise<void>;
 }
 
 export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
@@ -134,10 +135,30 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
     onSaveTemplate,
     onToggleGallery,
     onToggleCurriculum,
-    onAudioUpload
+    onAudioUpload,
+    onSendToPortal
 }) => {
     const { showToast } = useToast();
     const [isAILoading, setIsAILoading] = React.useState(false);
+    const [isSending, setIsSending] = React.useState(false);
+
+    const handleSendToPortal = async () => {
+        if (!selectedStudent || selectedStudent.id === 'temp') return;
+        setIsSending(true);
+        try {
+            if (onSendToPortal) {
+                await onSendToPortal();
+                showToast("Aula enviada para o portal do aluno!", "success");
+            } else {
+                // Fallback direct save if context doesn't provide it
+                onGenerateReport(); // PDF fallback
+            }
+        } catch (e) {
+            showToast("Erro ao enviar aula.", "error");
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     const handleGenerateAISuggestion = async () => {
         if (!currentObjective.trim()) {
@@ -436,10 +457,20 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
                             <button onClick={onSaveTemplate} className="w-full bg-[#FBF6F0] text-[#3C2415] py-5 rounded-[24px] font-black text-[10px] uppercase tracking-widest border border-[#3C2415]/10 hover:bg-white transition-all flex items-center justify-center gap-3">
                                 <PlusCircle className="w-4 h-4" /> Salvar como Modelo
                             </button>
+                            {selectedStudent.id !== 'temp' && (
+                                <button 
+                                    onClick={handleSendToPortal} 
+                                    disabled={isSending}
+                                    className={`w-full bg-[#1A110D] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-2xl active:scale-95 ${isSending ? 'opacity-50' : 'hover:bg-emerald-600'}`}
+                                >
+                                    {isSending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+                                    NOTIFICAR E ENVIAR AO PORTAL
+                                </button>
+                            )}
                             {selectedStudent.id !== 'temp' ? (
-                                <button onClick={onGenerateReport} className="w-full bg-[#E87A2C] text-white py-6 rounded-[32px] font-black text-xs uppercase tracking-widest hover:bg-orange-600 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-orange-500/20">
-                                    <Sparkles className="w-4 h-4" />
-                                    {(selectedStudent?.instrument === Instrument.VOCALS || selectedStudent?.instrument === Instrument.DRUMS) ? 'GERAR FICHA INTERATIVA (PDF)' : 'FINALIZAR E GERAR PNG'}
+                                <button onClick={onGenerateReport} className="w-full bg-white text-[#E87A2C] border-2 border-[#E87A2C]/20 py-5 rounded-[32px] font-black text-[10px] uppercase tracking-widest hover:bg-orange-50 transition-all flex items-center justify-center gap-3">
+                                    <ClipboardList className="w-4 h-4" />
+                                    Gerar PDF de Segurança
                                 </button>
                             ) : (
                                 <p className="text-[10px] font-bold text-stone-400 text-center uppercase tracking-widest px-4">Selecione um aluno para gerar PDFs ou relatórios finais</p>
@@ -448,7 +479,6 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
                     </section>
                 </div>
             </div>
-
         </div>
     );
 };
