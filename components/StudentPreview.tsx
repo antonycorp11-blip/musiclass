@@ -177,7 +177,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                         >
                             {/* Brand Zone */}
                             <div 
-                                className="flex flex-col shrink-0 pr-10"
+                                className="flex flex-col shrink-0 pr-8"
                                 style={{ transform: `translateX(${designSettings?.logoOffset || 0}px)` }}
                             >
                                 <img 
@@ -185,12 +185,12 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                     alt="Logo" 
                                     className="w-auto object-contain self-start" 
                                     style={{ 
-                                        height: `${designSettings.logoHeight}px`,
-                                        marginBottom: designSettings.showMusiClass ? '8px' : '0'
+                                        height: `${(designSettings.logoHeight || 50) * 0.8}px`,
+                                        marginBottom: designSettings.showMusiClass ? '4px' : '0'
                                     }}
                                 />
                                 {designSettings.showMusiClass && (
-                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] font-sans ml-1">MusiClass</span>
+                                    <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] font-sans ml-1 text-left">MusiClass</span>
                                 )}
                             </div>
 
@@ -202,10 +202,10 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 className="flex-1 flex flex-col justify-center px-6 min-w-0"
                                 style={{ transform: `translateX(${designSettings.studentOffset}px)` }}
                             >
-                                <div className="mb-2">
+                                <div className="mb-1">
                                     <span 
-                                        className="font-black text-white uppercase tracking-tight leading-none truncate block"
-                                        style={{ fontSize: `${designSettings.studentFontSize || 24}px` }}
+                                        className="font-black text-white uppercase tracking-tight leading-none block"
+                                        style={{ fontSize: `${(designSettings.studentFontSize || 24) * 0.9}px` }}
                                     >
                                         {shortStudentName}
                                     </span>
@@ -229,13 +229,13 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
                             {/* Teacher Zone */}
                             <div 
-                                className="shrink-0 text-right flex flex-col justify-center max-w-[220px]"
-                                style={{ transform: `translateX(${designSettings.teacherOffset}px)` }}
+                                className="shrink-0 text-right flex flex-col justify-center"
+                                style={{ transform: `translateX(${designSettings.teacherOffset}px)`, minWidth: '150px' }}
                             >
-                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1 leading-none">Instrutor</span>
+                                <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1 leading-none">Instrutor</span>
                                 <span 
-                                    className="font-black text-white/70 uppercase tracking-tight leading-tight truncate"
-                                    style={{ fontSize: `${designSettings.teacherFontSize || 16}px` }}
+                                    className="font-black text-white/70 uppercase tracking-tight leading-tight"
+                                    style={{ fontSize: `${(designSettings.teacherFontSize || 16) * 0.9}px` }}
                                 >
                                     Prof. {teacherName}
                                 </span>
