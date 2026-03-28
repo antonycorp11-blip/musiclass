@@ -32,6 +32,9 @@ import { RankingView } from './RankingView';
 import { ChordVisualizer } from '../ChordVisualizer';
 import { Instrument } from '../../types';
 import { calculatePedagogicalRadar, fetchCurriculumTopics, fetchStudentCurriculumProgress, getInstrumentGroup } from '../../services/curriculumService';
+import { Toolbox } from '../Toolbox';
+import { PdfIconBox } from '../PdfUtils';
+import { Palette, Activity } from 'lucide-react';
 
 
 interface Props {
@@ -46,7 +49,8 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
     const [loading, setLoading] = useState(true);
     const [isStudying, setIsStudying] = useState(false);
     const [studyTime, setStudyTime] = useState(0);
-    const [activeTab, setActiveTab] = useState<'home' | 'ranking_students' | 'ranking_teachers' | 'settings'>('home');
+    const [activeTab, setActiveTab] = useState<'home' | 'ranking_students' | 'ranking_teachers' | 'curriculum' | 'tools' | 'settings'>('home');
+    const [progressToday, setProgressToday] = useState<{ minutes: number, done: boolean }>({ minutes: 0, done: false });
     const [history, setHistory] = useState<LessonHistory[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [curriculumInfo, setCurriculumInfo] = useState<any>(null);
@@ -131,22 +135,27 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
 
     const handleFinishStudy = async () => {
         setIsStudying(false);
-        const minutes = Math.floor(studyTime / 60);
+        const minutes = Math.ceil(studyTime / 60);
         
-        if (minutes < 1) {
-            showToast("Sessão muito curta para registrar pontos.", "info");
-            setStudyTime(0);
-            return;
+        if (minutes < 1 && studyTime > 10) { // Pequena margem para testes
+             showToast("Sessão muito curta para registrar pontos.", "info");
+             setStudyTime(0);
+             return;
         }
 
         try {
-            // Update points logic (Mock simple update)
             const newPoints = (student?.points || 0) + (minutes * 2);
-            await supabase.from('mc_students').update({ points: newPoints }).eq('id', studentId);
+            await supabase.from('mc_students').update({ 
+                points: newPoints,
+                last_study_date: new Date().toISOString().split('T')[0],
+                last_study_minutes: minutes
+            }).eq('id', studentId);
             
+            setProgressToday({ minutes, done: true });
             showToast(`Treino concluído! +${minutes * 2} XP ganhos.`, "success");
             setStudyTime(0);
             setStudent(prev => prev ? { ...prev, points: newPoints } : null);
+            setSelectedLesson(null); // Fecha o modal ao finalizar se estiver nele
         } catch (e) {
             showToast("Erro ao salvar progresso.", "error");
         }
@@ -166,6 +175,48 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                 return (
                     <div className="pt-10">
                         <RankingView teachers={teachers} lessonHistory={[]} students={[]} />
+                    </div>
+                );
+            case 'curriculum':
+                return (
+                    <div className="pt-10 pb-20 space-y-8">
+                         <div className="flex items-center gap-4 mb-4">
+                             <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-white">
+                                 <GraduationCap className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h2 className="text-xl font-black uppercase tracking-tighter">Plano de Estudos</h2>
+                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Seu progresso pedagógico</p>
+                             </div>
+                         </div>
+                         
+                         {curriculumInfo?.pendingTopics?.map((t: any) => (
+                             <div key={t.id} className="bg-white/5 border border-white/10 rounded-[32px] p-6 space-y-4">
+                                 <div className="flex items-center justify-between">
+                                     <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-3 py-1 rounded-full bg-[#E87A2C]/5">MÊS {t.month_index}</span>
+                                     <BookOpen className="w-5 h-5 text-white/10" />
+                                 </div>
+                                 <h3 className="text-lg font-black text-white uppercase">{t.title}</h3>
+                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                     <p className="text-xs text-white/60 leading-relaxed">{t.content_text || 'Conteúdo teórico em desenvolvimento para este tópico.'}</p>
+                                 </div>
+                             </div>
+                         ))}
+                    </div>
+                );
+            case 'tools':
+                return (
+                    <div className="pt-10 pb-20">
+                         <div className="flex items-center gap-4 mb-10">
+                             <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-white">
+                                 <Activity className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h2 className="text-xl font-black uppercase tracking-tighter">Ferramentas</h2>
+                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Apoio ao seu estudo</p>
+                             </div>
+                         </div>
+                         <Toolbox />
                     </div>
                 );
             case 'home':
@@ -196,6 +247,19 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                              </span>
                                          )}
                                      </div>
+
+                                     {/* Barra de Progresso Diária */}
+                                     {progressToday.done && (
+                                         <div className="mb-6 p-4 bg-white/5 rounded-2xl border border-white/10 animate-fade-in">
+                                             <div className="flex justify-between items-center mb-2">
+                                                 <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest">Meta Diária Alcançada</p>
+                                                 <p className="text-[10px] font-black text-white uppercase">{progressToday.minutes} MIN</p>
+                                             </div>
+                                             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                                 <div className="h-full bg-[#E87A2C] w-full shadow-[0_0_10px_rgba(232,122,44,0.5)]"></div>
+                                             </div>
+                                         </div>
+                                     )}
 
                                      {lastLesson ? (
                                          <div className="space-y-6">
@@ -439,18 +503,75 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                              </section>
                          )}
 
+                         {/* Solos e Melodias */}
+                         {selectedLesson.report_data?.solos?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Solos e Melodias</h4>
+                                     <Music className="w-5 h-5 text-white/20" />
+                                 </div>
+                                 <div className="space-y-6">
+                                     {selectedLesson.report_data.solos.map((solo: any, i: number) => (
+                                         <div key={i} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                             <p className="font-black text-[10px] uppercase text-[#E87A2C] mb-6 tracking-widest">{solo.title || `Melodia ${i + 1}`}</p>
+                                             <div className="flex flex-wrap gap-4">
+                                                 {(() => {
+                                                     const maxPos = Math.max(...(solo.notes || []).map((n: any) => n.position || 0), 0);
+                                                     const steps = Array.from({ length: maxPos + 1 });
+                                                     return steps.map((_, stepIdx) => {
+                                                         const harmonyNotes = (solo.notes || []).filter((n: any) => n.type === 'harmony' && (n.position || 0) === stepIdx);
+                                                         const soloNotes = (solo.notes || []).filter((n: any) => n.type === 'solo' && (n.position || 0) === stepIdx);
+                                                         if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
+                                                         return (
+                                                             <div key={stepIdx} className="flex flex-col gap-2 min-w-[60px] bg-white/5 p-3 rounded-2xl border border-white/10">
+                                                                 <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                     {harmonyNotes.map((n: any, idx: number) => (
+                                                                         <PdfIconBox key={idx} text={n.note} bgColor="bg-rose-600" />
+                                                                     ))}
+                                                                 </div>
+                                                                 <div className="h-px bg-white/10 w-full" />
+                                                                 <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                     {soloNotes.map((n: any, idx: number) => (
+                                                                         <PdfIconBox key={idx} text={n.note} bgColor="bg-blue-600" />
+                                                                     ))}
+                                                                 </div>
+                                                             </div>
+                                                         );
+                                                     });
+                                                 })()}
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
                          <div className="py-10 text-center opacity-20">
                              <p className="text-[10px] font-black uppercase tracking-[0.4em]">MusiClass Digital Ecosystem</p>
                          </div>
                     </div>
 
                     {/* Footer fixo do Modal */}
-                    <div className="p-6 bg-[#1A110D] border-t border-white/10">
+                    <div className="p-6 bg-[#1A110D] border-t border-white/10 space-y-4">
+                         {isStudying && (
+                             <div className="bg-[#E87A2C]/10 rounded-2xl p-4 border border-[#E87A2C]/20 flex items-center justify-between">
+                                 <div>
+                                     <p className="text-[10px] font-black text-[#E87A2C] uppercase">Tempo de Treino</p>
+                                     <p className="text-xl font-black text-white">{formatTime(studyTime)}</p>
+                                 </div>
+                                 <button 
+                                    onClick={handleFinishStudy}
+                                    className="bg-[#E87A2C] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest"
+                                 >
+                                    FINALIZAR ESTUDOS
+                                 </button>
+                             </div>
+                         )}
                          <button 
                             onClick={() => setSelectedLesson(null)}
-                            className="w-full bg-[#E87A2C] text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] active:scale-[0.98] transition-all"
+                            className="w-full bg-white/5 text-white/40 py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] active:scale-[0.98] transition-all border border-white/5"
                          >
-                            CONCLUÍDO
+                            FECHAR FICHA
                          </button>
                     </div>
                 </div>
@@ -465,6 +586,18 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                   <Home className="w-6 h-6" />
                 </button>
                 <button 
+                  onClick={() => setActiveTab('curriculum')}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'curriculum' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
+                >
+                  <GraduationCap className="w-6 h-6" />
+                </button>
+                <button 
+                   onClick={() => setActiveTab('tools')}
+                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'tools' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
+                >
+                  <Activity className="w-6 h-6" />
+                </button>
+                <button 
                   onClick={() => setActiveTab('ranking_students')}
                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'ranking_students' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
                 >
@@ -475,12 +608,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'ranking_teachers' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
                 >
                   <Sparkles className="w-6 h-6" />
-                </button>
-                <button 
-                  onClick={() => setActiveTab('settings')}
-                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'settings' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
-                >
-                  <GraduationCap className="w-6 h-6" />
                 </button>
             </nav>
         </div>
