@@ -16,11 +16,17 @@ import {
     Sparkles,
     Layout,
     Home,
-    GraduationCap
+    GraduationCap,
+    ListChecks,
+    History,
+    Star
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { StudentRankingView } from './StudentRankingView';
 import { RankingView } from './RankingView';
+import { ChordVisualizer } from '../ChordVisualizer';
+import { Instrument } from '../../types';
+import { calculatePedagogicalRadar, fetchCurriculumTopics, fetchStudentCurriculumProgress, getInstrumentGroup } from '../../services/curriculumService';
 
 
 interface Props {
@@ -38,6 +44,8 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
     const [activeTab, setActiveTab] = useState<'home' | 'ranking_students' | 'ranking_teachers' | 'settings'>('home');
     const [history, setHistory] = useState<LessonHistory[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [curriculumInfo, setCurriculumInfo] = useState<any>(null);
+    const [showFullHistory, setShowFullHistory] = useState(false);
 
     useEffect(() => {
         const fetchStudentData = async () => {
@@ -61,12 +69,27 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                 
                 if (hData) {
                     setHistory(hData);
-                    setLastLesson(hData[0] || null);
+                    const last = hData[0] || null;
+                    setLastLesson(last);
+                    
+                    // Auto-start timer if we have a recent lesson (within 2 hours)
+                    if (last && new Date().getTime() - new Date(last.created_at).getTime() < 1000 * 60 * 60 * 2) {
+                       setIsStudying(true);
+                    }
                 }
 
                 // 3. Fetch Teachers (for ranking)
                 const { data: tData } = await supabase.from('mc_teachers').select('*');
                 if (tData) setTeachers(tData);
+
+                // 4. Fetch Curriculum
+                if (st) {
+                    const group = getInstrumentGroup(st.instrument as Instrument);
+                    const allTopics = await fetchCurriculumTopics(group);
+                    const progress = await fetchStudentCurriculumProgress(studentId, allTopics);
+                    const radar = calculatePedagogicalRadar(st, allTopics, progress);
+                    setCurriculumInfo(radar);
+                }
             } catch (e) {
                 console.error(e);
                 showToast("Erro ao carregar portal.", "error");
@@ -220,23 +243,102 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                             </div>
 
                             {lastLesson ? (
-                                <div className="bg-white rounded-[32px] p-8 border border-white/5 shadow-xl">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <span className="bg-[#E87A2C]/10 text-[#E87A2C] text-[9px] font-black uppercase px-3 py-1 rounded-lg">
-                                            {new Date(lastLesson.lesson_date).toLocaleDateString()}
-                                        </span>
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-[32px] p-8 border border-white/5 shadow-xl">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <span className="bg-[#E87A2C]/10 text-[#E87A2C] text-[9px] font-black uppercase px-3 py-1 rounded-lg">
+                                                {new Date(lastLesson.lesson_date).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <h4 className="text-2xl font-black text-[#1A110D] uppercase tracking-tighter mb-4">
+                                            {lastLesson.objective || 'Atividade Prática'}
+                                        </h4>
+                                        
+                                        {/* Harmonias e Acordes no Portal */}
+                                        {lastLesson.report_data?.chords?.length > 0 && (
+                                            <div className="grid grid-cols-3 gap-3 mb-6">
+                                                {lastLesson.report_data.chords.map((chord: any, i: number) => (
+                                                    <div key={i} className="bg-stone-50 p-2 rounded-xl border border-stone-100 flex flex-col items-center">
+                                                        <ChordVisualizer 
+                                                            instrument={student?.instrument as any} 
+                                                            chordNotes={chord.notes}
+                                                            root={chord.root}
+                                                            type={chord.typeId}
+                                                            ext={chord.extId}
+                                                            bass={chord.bass}
+                                                            notesWithIndices={chord.notesWithIndices}
+                                                            isCustom={chord.isCustom}
+                                                            compact
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Checklist de Exercícios */}
+                                        {lastLesson.report_data?.exercises?.length > 0 && (
+                                            <div className="space-y-3 pt-4 border-t border-stone-100">
+                                                {lastLesson.report_data.exercises.map((ex: string, i: number) => (
+                                                    <div key={i} className="flex items-center gap-3 p-3 bg-[#FBF6F0] rounded-xl">
+                                                        <div className="w-6 h-6 bg-[#E87A2C] rounded-lg flex items-center justify-center text-white text-[10px] font-black">{i+1}</div>
+                                                        <span className="text-[11px] font-bold text-[#3C2415] uppercase">{ex}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                    <h4 className="text-2xl font-black text-[#1A110D] uppercase tracking-tighter mb-4 line-clamp-2">
-                                        {lastLesson.objective || 'Atividade Prática'}
-                                    </h4>
-                                    <div className="flex gap-2">
-                                        <span className="text-[10px] font-bold text-[#1A110D]/40 uppercase tracking-widest">
-                                            {lastLesson.report_data.chords.length} Acordes
-                                        </span>
-                                        <span className="text-[#1A110D]/10">•</span>
-                                        <span className="text-[10px] font-bold text-[#1A110D]/40 uppercase tracking-widest">
-                                            {lastLesson.report_data.exercises.length} Metas
-                                        </span>
+
+                                    {/* Matérias Pendentes (Curriculum) */}
+                                    {curriculumInfo && curriculumInfo.status !== 'ok' && (
+                                        <div className="bg-[#1A110D] border border-orange-500/20 rounded-[32px] p-8 space-y-4">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-orange-500 flex items-center gap-2">
+                                                <GraduationCap className="w-5 h-5" /> Plano de Estudos
+                                            </h3>
+                                            <p className="text-xs text-white/60 font-medium">Você tem conteúdos novos ou pendentes:</p>
+                                            <div className="space-y-2">
+                                                {curriculumInfo.idealTopic && (
+                                                    <div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center text-white"><Star className="w-4 h-4" /></div>
+                                                            <span className="text-[10px] font-black uppercase">{curriculumInfo.idealTopic.title}</span>
+                                                        </div>
+                                                        <span className="text-[8px] font-black text-orange-500 uppercase tracking-widest">Destaque</span>
+                                                    </div>
+                                                )}
+                                                {curriculumInfo.pendingTopics?.slice(0, 2).map((t: any) => (
+                                                    <div key={t.id} className="bg-white/5 p-4 rounded-2xl flex items-center gap-3">
+                                                        <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white/40"><BookOpen className="w-4 h-4" /></div>
+                                                        <span className="text-[10px] font-black uppercase text-white/40">{t.title}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Histórico Anterior */}
+                                    <div className="space-y-4 pt-10">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                                            <History className="w-4 h-4" /> Histórico de Aulas
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {(showFullHistory ? history : history.slice(1, 4)).map((h, i) => (
+                                                <div key={h.id} className="bg-white/5 p-6 rounded-3xl border border-white/5 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-1">{new Date(h.lesson_date).toLocaleDateString()}</p>
+                                                        <p className="text-sm font-bold uppercase line-clamp-1">{h.objective || 'Atividade Prática'}</p>
+                                                    </div>
+                                                    <ChevronRight className="w-5 h-5 text-white/20" />
+                                                </div>
+                                            ))}
+                                            {!showFullHistory && history.length > 4 && (
+                                                <button 
+                                                    onClick={() => setShowFullHistory(true)}
+                                                    className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-colors"
+                                                >
+                                                    Ver todas as {history.length} aulas
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
