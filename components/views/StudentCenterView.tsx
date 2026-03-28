@@ -17,7 +17,8 @@ import {
     ChevronRight,
     QrCode,
     Trash2,
-    RotateCcw
+    RotateCcw,
+    Link
 } from 'lucide-react';
 import { Logo } from '../Logo';
 import { PedagogicalRadar } from '../PedagogicalRadar';
@@ -266,6 +267,27 @@ export const StudentCenterView: React.FC<StudentCenterViewProps> = ({
                         </div>
                     </div>
                 </div>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 p-6 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-4 mt-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500"><Link className="w-6 h-6" /></div>
+                    <div>
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest leading-none mb-1">Link do Aluno</p>
+                        <p className="text-sm font-black text-white uppercase tracking-tight">Portal Exclusivo do Aluno</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={() => {
+                        const baseUrl = window.location.origin;
+                        const portalUrl = `${baseUrl}/?portal_id=${student.id}`;
+                        navigator.clipboard.writeText(portalUrl);
+                        showToast("Link do Portal copiado!", "success");
+                    }}
+                    className="w-full md:w-auto px-8 py-4 bg-[#E87A2C] hover:bg-orange-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2"
+                >
+                    <Link className="w-4 h-4" /> Copiar Link do Portal
+                </button>
             </div>
 
             {/* Quick Actions */}

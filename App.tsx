@@ -359,7 +359,7 @@ const App: React.FC = () => {
   const teacherStudents = students.filter(s => s.teacher_id === currentUser?.id || currentUser?.role === 'director');
 
   if (portalStudentId) {
-    return <StudentPortalView studentId={portalStudentId} />;
+    return <StudentPortalView studentId={portalStudentId} allStudents={students} />;
   }
 
   if (loading) {
