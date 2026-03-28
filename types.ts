@@ -35,6 +35,8 @@ export interface Student {
   createdAt?: number | string;
   lesson_count?: number;
   contract_total?: number;
+  avatar_url?: string;
+  points?: number;
 }
 
 export interface LessonTemplate {

@@ -49,8 +49,10 @@ import { CurriculumView } from './components/views/CurriculumView';
 import { QuizPlayer } from './components/QuizPlayer';
 
 import { RankingView } from './components/views/RankingView';
+import { StudentRankingView } from './components/views/StudentRankingView';
 import { CurriculumTopic, StudentTopicProgress } from './types';
 import { StudentCenterView } from './components/views/StudentCenterView';
+import { StudentPortalView } from './components/views/StudentPortalView';
 
 // Modals
 import { AddStudentModal } from './components/modals/AddStudentModal';
@@ -75,8 +77,16 @@ const App: React.FC = () => {
         exportSuccess
     } = useLessonContext();
 
-    const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox' | 'curriculum' | 'student-center' | 'ranking'>('students');
+    const [activeTab, setActiveTab] = useState<'students' | 'lesson' | 'dashboard' | 'history' | 'toolbox' | 'curriculum' | 'student-center' | 'ranking' | 'student-ranking'>('students');
     const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [portalStudentId, setPortalStudentId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const portalId = urlParams.get('portal_id');
+        if (portalId) setPortalStudentId(portalId);
+    }, []);
+
     const [isAddingTeacher, setIsAddingTeacher] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -348,6 +358,10 @@ const App: React.FC = () => {
 
   const teacherStudents = students.filter(s => s.teacher_id === currentUser?.id || currentUser?.role === 'director');
 
+  if (portalStudentId) {
+    return <StudentPortalView studentId={portalStudentId} />;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#1A110D] flex items-center justify-center">
@@ -451,14 +465,20 @@ const App: React.FC = () => {
           <MenuButton 
             active={activeTab === 'toolbox'} 
             onClick={() => { setActiveTab('toolbox'); setIsSidebarOpen(false); }} 
-            icon={<Wrench className="w-5 h-5" />} 
-            label="Ferramentas" 
+            icon={<ScrollText className="w-5 h-5" />} 
+            label="Grade Master" 
+          />
+          <MenuButton 
+            active={activeTab === 'student-ranking'} 
+            onClick={() => { setActiveTab('student-ranking'); setIsSidebarOpen(false); }} 
+            icon={<Trophy className="w-5 h-5" />} 
+            label="Ranking Alunos" 
           />
           <MenuButton 
             active={activeTab === 'ranking'} 
             onClick={() => { setActiveTab('ranking'); setIsSidebarOpen(false); }} 
-            icon={<Trophy className="w-5 h-5" />} 
-            label="Ranking" 
+            icon={<Sparkles className="w-5 h-5" />} 
+            label="Hall da Fama" 
           />
 
           <div className="my-4 border-t border-white/5 shrink-0" />
@@ -604,6 +624,10 @@ const App: React.FC = () => {
 
         {activeTab === 'curriculum' && (
           <CurriculumView currentUser={currentUser} students={students} />
+        )}
+
+        {activeTab === 'student-ranking' && (
+          <StudentRankingView students={students} />
         )}
 
         {activeTab === 'ranking' && (
