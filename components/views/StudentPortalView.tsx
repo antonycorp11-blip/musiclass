@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BellRing } from 'lucide-react';
 import { Student, Teacher, LessonHistory } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -158,6 +159,19 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
         };
 
         fetchStudentData();
+    const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
+
+    useEffect(() => {
+        if ("Notification" in window) {
+            setPushStatus(Notification.permission as any);
+            if (Notification.permission === "default") {
+                // Pequeno delay para não assustar no primeiro frame
+                setTimeout(() => {
+                    subscribeToPush();
+                }, 2000);
+            }
+        }
+    }, []);
     }, [studentId]);
 
     // Timer Logic
@@ -439,8 +453,8 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                     <div className="relative z-10 flex flex-col items-center gap-16">
                                         {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any, idx: number) => {
                                             const isPending = curriculumInfo.pendingTopics?.some((pt: any) => pt.id === t.id);
-                                            const isCompleted = !isPending;
-                                            // Lógica de ziguezague para o "mapinha"
+                                            const progress = curriculumInfo.progress?.find((p: any) => p.topic_id === t.id);
+                                            const isCompleted = progress?.status === "quiz_completed";
                                             const align = idx % 2 === 0 ? 'ml-24' : 'mr-24';
                                             const rotate = idx % 2 === 0 ? 'rotate-3' : '-rotate-3';
 
@@ -526,40 +540,41 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                         </div>
                     </>
                 );
-            case 'settings':
+            case "settings":
                 return (
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-[#E87A2C]">
-                                <Settings className="w-6 h-6" />
+                    <div className="space-y-12 pb-20 animate-in slide-in-from-bottom-10 duration-500">
+                        <div className="flex flex-col items-center text-center mt-12">
+                            <div className="w-24 h-24 bg-[#E87A2C] rounded-[40px] flex items-center justify-center text-[#1A110D] shadow-2xl mb-6">
+                                <BellRing className="w-10 h-10 animate-bounce" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-black uppercase tracking-tighter">Configurações</h2>
-                                <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">Personalize sua experiência</p>
-                            </div>
+                            <h3 className="text-3xl font-black uppercase tracking-tighter">Central de Alertas</h3>
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mt-2">{pushStatus === "granted" ? "SISTEMA OPERACIONAL" : "AGUARDANDO ATIVAÇÃO"}</p>
                         </div>
 
-                        <div className="bg-white/5 rounded-[32px] p-8 border border-white/5 shadow-xl">
-                            <h4 className="text-sm font-black text-white mb-4 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-[#E87A2C]" />
-                                Notificações Nativas
-                            </h4>
-                            <p className="text-xs text-white/40 mb-8 leading-relaxed">
-                                Receba lembretes de treino diretamente no seu celular às 07:00 e 19:00. 
-                                <span className="block mt-2 text-[#E87A2C]/60 italic">* Requer que o App esteja "Adicionado à Tela de Início" no iOS.</span>
-                            </p>
-                            <button 
-                                onClick={subscribeToPush}
-                                className="w-full bg-[#E87A2C] text-white py-6 rounded-[28px] font-black text-xs uppercase tracking-[0.2em] active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg shadow-orange-500/20"
-                            >
-                                <Activity className="w-4 h-4" />
-                                ATIVAR LEMBRETES DE TREINO
-                            </button>
+                        <div className="bg-white/5 p-8 rounded-[48px] border border-white/10 space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-[#E87A2C]"><Activity className="w-6 h-6" /></div>
+                                <div>
+                                    <h4 className="font-black uppercase tracking-tight">Status de Conexão</h4>
+                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest italic">{pushStatus === "granted" ? "Você está conectado com o Studio" : "Clique abaixo para autorizar"}</p>
+                                </div>
+                            </div>
+
+                            {pushStatus !== "granted" && (
+                                <button 
+                                    onClick={subscribeToPush}
+                                    className="w-full bg-white text-[#1A110D] py-6 rounded-[32px] font-black text-xs uppercase tracking-[0.2em] active:scale-95 transition-all flex items-center justify-center gap-3 shadow-2xl"
+                                >
+                                    <BellRing className="w-4 h-4" /> REATIVAR NOTIFICAÇÕES
+                                </button>
+                            )}
+
+                            <div className="pt-6 border-t border-white/5">
+                                <p className="text-[9px] font-black text-white/20 uppercase tracking-widest text-center italic">ID do Estudante: {studentId.substring(0,8)}...MusiClass</p>
+                            </div>
                         </div>
                     </div>
                 );
-        }
-    };
 
     return (
         <div className="min-h-screen bg-[#1A110D] text-white p-6 pb-32 animate-fade-in font-sans selection:bg-[#E87A2C] selection:text-white">
@@ -881,10 +896,11 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                   <Trophy className="w-6 h-6" />
                 </button>
                 <button 
-                  onClick={() => setActiveTab('settings')}
-                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === 'settings' ? 'bg-[#E87A2C] text-white' : 'text-white/40'}`}
+                <button 
+                  onClick={() => setActiveTab("settings")}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "settings" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
                 >
-                  <Settings className="w-6 h-6" />
+                  <BellRing className="w-6 h-6" />
                 </button>
             </nav>
         </div>
