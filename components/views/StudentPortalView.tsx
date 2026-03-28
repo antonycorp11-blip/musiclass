@@ -19,7 +19,12 @@ import {
     GraduationCap,
     ListChecks,
     History,
-    Star
+    Star,
+    X,
+    Maximize2,
+    Eye,
+    ChevronDown,
+    Map
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { StudentRankingView } from './StudentRankingView';
@@ -46,6 +51,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [curriculumInfo, setCurriculumInfo] = useState<any>(null);
     const [showFullHistory, setShowFullHistory] = useState(false);
+    const [selectedLesson, setSelectedLesson] = useState<LessonHistory | null>(null);
 
     useEffect(() => {
         const fetchStudentData = async () => {
@@ -82,13 +88,18 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                 const { data: tData } = await supabase.from('mc_teachers').select('*');
                 if (tData) setTeachers(tData);
 
-                // 4. Fetch Curriculum
                 if (st) {
                     const group = getInstrumentGroup(st.instrument as Instrument);
                     const allTopics = await fetchCurriculumTopics(group);
-                    const progress = await fetchStudentCurriculumProgress(studentId, allTopics);
-                    const radar = calculatePedagogicalRadar(st, allTopics, progress);
+                    // Fetch progress again to be sure
+                    const { data: pData } = await supabase.from('mc_student_topics').select('*').eq('student_id', studentId);
+                    const progressWithTopics = (pData || []).map(p => ({
+                        ...p,
+                        topic: allTopics.find(t => t.id === p.topic_id)
+                    }));
+                    const radar = calculatePedagogicalRadar(st, allTopics, progressWithTopics);
                     setCurriculumInfo(radar);
+                    console.log("Radar Aluno:", radar);
                 }
             } catch (e) {
                 console.error(e);
@@ -161,201 +172,289 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
             default:
                 return (
                     <>
-                        {/* Header Perfil */}
-                        <header className="flex items-center justify-between mb-10 pt-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-[#E87A2C] rounded-2xl flex items-center justify-center shadow-lg border-2 border-white/10 overflow-hidden">
-                                    {student.avatar_url ? (
-                                        <img src={student.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <User className="w-8 h-8 text-white" />
-                                    )}
+                        {/* Conteúdo Principal (Aba Home) */}
+                        <div className="space-y-10 pb-20">
+                            {/* Card de Aula em Destaque (Estilo Netflix/Apple) */}
+                            <section className="relative group">
+                                <div className="absolute -inset-1 bg-gradient-to-r from-[#E87A2C] to-orange-600 rounded-[40px] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                <div className="relative bg-[#2A1810] border border-white/10 rounded-[40px] p-8 shadow-2xl overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-32 h-32 bg-[#E87A2C]/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                                     
+                                     <div className="flex items-center justify-between mb-8">
+                                         <div className="flex items-center gap-3">
+                                             <div className="w-10 h-10 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-[#1A110D]">
+                                                 <BookOpen className="w-5 h-5" />
+                                             </div>
+                                             <div>
+                                                 <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Sua Aula hoje</p>
+                                                 <p className="text-sm font-black text-white uppercase tracking-tight">Conteúdo de Estudo</p>
+                                             </div>
+                                         </div>
+                                         {lastLesson && (
+                                             <span className="text-[10px] font-black text-[#E87A2C] uppercase px-3 py-1 bg-white/5 rounded-lg border border-white/10">
+                                                 {new Date(lastLesson.lesson_date).toLocaleDateString()}
+                                             </span>
+                                         )}
+                                     </div>
+
+                                     {lastLesson ? (
+                                         <div className="space-y-6">
+                                             <h2 className="text-3xl font-black text-white uppercase tracking-tighter leading-[1.1]">
+                                                 {lastLesson.objective || 'Atividade Prática de Hoje'}
+                                             </h2>
+
+                                             <div className="flex items-center gap-4 py-4 border-y border-white/5">
+                                                 <div className="flex -space-x-2">
+                                                     {(lastLesson.report_data?.chords || []).slice(0, 3).map((_, i) => (
+                                                         <div key={i} className="w-8 h-8 rounded-full bg-[#E87A2C] border-2 border-[#1A110D] flex items-center justify-center text-[10px] font-black">C</div>
+                                                     ))}
+                                                 </div>
+                                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
+                                                     {lastLesson.report_data?.chords?.length || 0} Harmonias • {lastLesson.report_data?.exercises?.length || 0} Metas
+                                                 </p>
+                                             </div>
+
+                                             <button 
+                                                 onClick={() => setSelectedLesson(lastLesson)}
+                                                 className="w-full bg-white text-[#1A110D] py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                                             >
+                                                 <Eye className="w-4 h-4" /> REVISAR CONTEÚDO AGORA
+                                             </button>
+                                         </div>
+                                     ) : (
+                                         <div className="py-10 text-center">
+                                             <Music className="w-12 h-12 text-white/10 mx-auto mb-4" />
+                                             <p className="text-white/20 font-black uppercase text-[10px] tracking-widest">Nenhuma aula disponível ainda</p>
+                                         </div>
+                                     )}
                                 </div>
-                                <div>
-                                    <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">{student.name.split(' ')[0]}</h1>
-                                    <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest mt-1">{student.instrument}</p>
-                                </div>
-                            </div>
-                            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 text-right">
-                                <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">Engajamento</p>
-                                <p className="text-xl font-black text-[#E87A2C] leading-none flex items-center gap-2 justify-end">
-                                    {student.points || 0} <Award className="w-4 h-4" />
-                                </p>
-                            </div>
-                        </header>
+                            </section>
 
-                        {/* Quick Stats Grid */}
-                        <div className="grid grid-cols-2 gap-4 mb-8">
-                            <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                                <Trophy className="w-6 h-6 text-yellow-500 mb-3" />
-                                <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Seu Ranking</p>
-                                <p className="text-2xl font-black">#--</p>
-                            </div>
-                            <div className="bg-white/5 rounded-3xl p-6 border border-white/5">
-                                <CheckCircle2 className="w-6 h-6 text-emerald-500 mb-3" />
-                                <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Aulas Lidas</p>
-                                <p className="text-2xl font-black">{student.lesson_count || 0}</p>
-                            </div>
-                        </div>
-
-                        {/* Cronômetro de Estudo */}
-                        <section className={`rounded-[40px] p-8 mb-8 transition-all duration-500 ${isStudying ? 'bg-[#E87A2C] shadow-2xl shadow-orange-500/30' : 'bg-white/5 border border-white/10'}`}>
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <h3 className={`text-xl font-black uppercase tracking-tighter ${isStudying ? 'text-[#1A110D]' : 'text-white'}`}>Hora de Estudar!</h3>
-                                    <p className={`text-[10px] font-bold uppercase tracking-widest ${isStudying ? 'text-[#1A110D]/60' : 'text-white/40'}`}>
-                                        {isStudying ? 'Contando XP...' : 'Inicie seu treino agora'}
-                                    </p>
-                                </div>
-                                <Clock className={`w-8 h-8 ${isStudying ? 'text-[#1A110D] animate-pulse' : 'text-white/20'}`} />
-                            </div>
-                            
-                            <div className="flex flex-col items-center gap-6">
-                                <p className={`text-6xl font-black tracking-tighter ${isStudying ? 'text-[#1A110D]' : 'text-white/20'}`}>
-                                    {formatTime(studyTime)}
-                                </p>
-                                
-                                {!isStudying ? (
-                                    <button 
-                                        onClick={() => setIsStudying(true)}
-                                        className="w-full bg-[#E87A2C] text-white py-5 rounded-2xl font-black text-lg uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all"
-                                    >
-                                        <Play className="w-6 h-6 fill-current" /> COMEÇAR TREINO
-                                    </button>
-                                ) : (
-                                    <button 
-                                        onClick={handleFinishStudy}
-                                        className="w-full bg-[#1A110D] text-white py-5 rounded-2xl font-black text-lg uppercase tracking-widest active:scale-95 transition-all shadow-xl"
-                                    >
-                                        FINALIZAR E GANHAR XP
-                                    </button>
-                                )}
-                            </div>
-                        </section>
-
-                        {/* Última Tarefa */}
-                        <section className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                                <h3 className="text-sm font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
-                                    <BookOpen className="w-4 h-4" /> Última Aula
-                                </h3>
-                                <ChevronRight className="w-4 h-4 text-white/20" />
-                            </div>
-
-                            {lastLesson ? (
-                                <div className="space-y-6">
-                                    <div className="bg-white rounded-[32px] p-8 border border-white/5 shadow-xl">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <span className="bg-[#E87A2C]/10 text-[#E87A2C] text-[9px] font-black uppercase px-3 py-1 rounded-lg">
-                                                {new Date(lastLesson.lesson_date).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                        <h4 className="text-2xl font-black text-[#1A110D] uppercase tracking-tighter mb-4">
-                                            {lastLesson.objective || 'Atividade Prática'}
-                                        </h4>
-                                        
-                                        {/* Harmonias e Acordes no Portal */}
-                                        {lastLesson.report_data?.chords?.length > 0 && (
-                                            <div className="grid grid-cols-3 gap-3 mb-6">
-                                                {lastLesson.report_data.chords.map((chord: any, i: number) => (
-                                                    <div key={i} className="bg-stone-50 p-2 rounded-xl border border-stone-100 flex flex-col items-center">
-                                                        <ChordVisualizer 
-                                                            instrument={student?.instrument as any} 
-                                                            chordNotes={chord.notes}
-                                                            root={chord.root}
-                                                            type={chord.typeId}
-                                                            ext={chord.extId}
-                                                            bass={chord.bass}
-                                                            notesWithIndices={chord.notesWithIndices}
-                                                            isCustom={chord.isCustom}
-                                                            compact
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Checklist de Exercícios */}
-                                        {lastLesson.report_data?.exercises?.length > 0 && (
-                                            <div className="space-y-3 pt-4 border-t border-stone-100">
-                                                {lastLesson.report_data.exercises.map((ex: string, i: number) => (
-                                                    <div key={i} className="flex items-center gap-3 p-3 bg-[#FBF6F0] rounded-xl">
-                                                        <div className="w-6 h-6 bg-[#E87A2C] rounded-lg flex items-center justify-center text-white text-[10px] font-black">{i+1}</div>
-                                                        <span className="text-[11px] font-bold text-[#3C2415] uppercase">{ex}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                            {/* Cronômetro (Mais Discreto) */}
+                            <section className={`rounded-[32px] p-6 transition-all duration-500 ${isStudying ? 'bg-[#E87A2C] shadow-2xl shadow-orange-500/20' : 'bg-white/5 border border-white/10'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                         <button 
+                                             onClick={() => isStudying ? handleFinishStudy() : setIsStudying(true)}
+                                             className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isStudying ? 'bg-[#1A110D] text-white' : 'bg-[#E87A2C] text-white'}`}
+                                         >
+                                             {isStudying ? <CheckCircle2 className="w-6 h-6" /> : <Play className="w-6 h-6 fill-current" />}
+                                         </button>
+                                         <div>
+                                             <p className={`text-[9px] font-black uppercase tracking-widest ${isStudying ? 'text-[#1A110D]/60' : 'text-white/40'}`}>
+                                                 {isStudying ? 'Treino em andamento' : 'Cronômetro de Estudo'}
+                                             </p>
+                                             <p className={`text-2xl font-black tabular-nums ${isStudying ? 'text-[#1A110D]' : 'text-white'}`}>
+                                                 {formatTime(studyTime)}
+                                             </p>
+                                         </div>
                                     </div>
+                                    <div className={`p-4 rounded-2xl border ${isStudying ? 'bg-[#1A110D]/5 border-[#1A110D]/10' : 'bg-white/5 border-white/10'}`}>
+                                         <Clock className={`w-5 h-5 ${isStudying ? 'text-[#1A110D]/40' : 'text-white/10'}`} />
+                                    </div>
+                                </div>
+                            </section>
 
-                                    {/* Matérias Pendentes (Curriculum) */}
-                                    {curriculumInfo && curriculumInfo.status !== 'ok' && (
-                                        <div className="bg-[#1A110D] border border-orange-500/20 rounded-[32px] p-8 space-y-4">
-                                            <h3 className="text-sm font-black uppercase tracking-widest text-orange-500 flex items-center gap-2">
-                                                <GraduationCap className="w-5 h-5" /> Plano de Estudos
-                                            </h3>
-                                            <p className="text-xs text-white/60 font-medium">Você tem conteúdos novos ou pendentes:</p>
-                                            <div className="space-y-2">
-                                                {curriculumInfo.idealTopic && (
-                                                    <div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between group">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 bg-orange-500 rounded-xl flex items-center justify-center text-white"><Star className="w-4 h-4" /></div>
-                                                            <span className="text-[10px] font-black uppercase">{curriculumInfo.idealTopic.title}</span>
-                                                        </div>
-                                                        <span className="text-[8px] font-black text-orange-500 uppercase tracking-widest">Destaque</span>
-                                                    </div>
-                                                )}
-                                                {curriculumInfo.pendingTopics?.slice(0, 2).map((t: any) => (
-                                                    <div key={t.id} className="bg-white/5 p-4 rounded-2xl flex items-center gap-3">
-                                                        <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-white/40"><BookOpen className="w-4 h-4" /></div>
-                                                        <span className="text-[10px] font-black uppercase text-white/40">{t.title}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Histórico Anterior */}
-                                    <div className="space-y-4 pt-10">
-                                        <h3 className="text-sm font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
-                                            <History className="w-4 h-4" /> Histórico de Aulas
+                            {/* Próximos Passos (Curriculum) - Estilo Map/Jornada */}
+                            {curriculumInfo && (curriculumInfo.idealTopic || curriculumInfo.status !== 'ok') && (
+                                <section className="space-y-6">
+                                    <div className="flex items-center justify-between px-2">
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
+                                            <Map className="w-4 h-4" /> Jornada Pedagógica
                                         </h3>
-                                        <div className="space-y-3">
-                                            {(showFullHistory ? history : history.slice(1, 4)).map((h, i) => (
-                                                <div key={h.id} className="bg-white/5 p-6 rounded-3xl border border-white/5 flex items-center justify-between">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-1">{new Date(h.lesson_date).toLocaleDateString()}</p>
-                                                        <p className="text-sm font-bold uppercase line-clamp-1">{h.objective || 'Atividade Prática'}</p>
-                                                    </div>
-                                                    <ChevronRight className="w-5 h-5 text-white/20" />
-                                                </div>
-                                            ))}
-                                            {!showFullHistory && history.length > 4 && (
-                                                <button 
-                                                    onClick={() => setShowFullHistory(true)}
-                                                    className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-colors"
-                                                >
-                                                    Ver todas as {history.length} aulas
-                                                </button>
-                                            )}
-                                        </div>
+                                        <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-3 py-1 rounded-full bg-[#E87A2C]/5">Nível {student.level || 'I'}</span>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="bg-white/5 border-2 border-dashed border-white/5 rounded-[32px] p-12 text-center">
-                                    <Music className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                                    <p className="text-white/20 font-black uppercase text-[10px] tracking-widest">Aguardando sua primeira aula...</p>
-                                </div>
+                                    
+                                    <div className="bg-[#1A110D] border border-white/5 rounded-[40px] p-2">
+                                         <div className="bg-white/5 rounded-[38px] p-6 space-y-4">
+                                             {curriculumInfo.idealTopic && (
+                                                 <div className="relative p-6 bg-gradient-to-br from-[#E87A2C] to-orange-600 rounded-3xl shadow-xl group">
+                                                     <Star className="absolute top-4 right-4 w-12 h-12 text-white/20 group-hover:rotate-12 transition-transform" />
+                                                     <p className="text-[9px] font-black text-white/60 uppercase tracking-widest mb-1">Próxima Conquista</p>
+                                                     <h4 className="text-xl font-black text-white uppercase tracking-tight">{curriculumInfo.idealTopic.title}</h4>
+                                                     <p className="text-[10px] font-medium text-white/80 mt-2 line-clamp-2">{curriculumInfo.idealTopic.content_text || 'Matéria teórica e prática em destaque.'}</p>
+                                                 </div>
+                                             )}
+                                             
+                                             <div className="grid grid-cols-1 gap-2">
+                                                 {curriculumInfo.pendingTopics?.slice(0, 3).map((t: any) => (
+                                                     <div key={t.id} className="p-4 bg-white/5 rounded-2xl flex items-center justify-between border border-white/5">
+                                                         <div className="flex items-center gap-3">
+                                                             <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/40 text-[10px] font-black">M{t.month_index}</div>
+                                                             <span className="text-[10px] font-black uppercase text-white/40">{t.title}</span>
+                                                         </div>
+                                                         <ChevronRight className="w-4 h-4 text-white/10" />
+                                                     </div>
+                                                 ))}
+                                             </div>
+                                         </div>
+                                    </div>
+                                </section>
                             )}
-                        </section>
+                            
+                            {/* Histórico Simplificado */}
+                            <section className="space-y-6">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
+                                    <History className="w-4 h-4" /> Aulas Passadas
+                                </h3>
+                                <div className="space-y-3">
+                                    {(showFullHistory ? history : history.slice(1, 4)).map((h, i) => (
+                                        <button 
+                                            key={h.id} 
+                                            onClick={() => setSelectedLesson(h)}
+                                            className="w-full bg-[#1A110D] border border-white/5 p-6 rounded-[32px] hover:bg-white/5 transition-all text-left flex items-center justify-between group"
+                                        >
+                                            <div className="flex items-center gap-5">
+                                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-[#E87A2C]/20 transition-colors">
+                                                    <Calendar className="w-5 h-5 text-white/20 group-hover:text-[#E87A2C]" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black text-[#E87A2C] uppercase mb-1 tracking-widest">{new Date(h.lesson_date).toLocaleDateString()}</p>
+                                                    <p className="text-sm font-bold uppercase text-white/70 line-clamp-1">{h.objective || 'Referência de Aula'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-full border border-white/5 flex items-center justify-center text-white/20 group-hover:text-white group-hover:border-white/20 transition-all">
+                                                <ChevronRight className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                    
+                                    {!showFullHistory && history.length > 4 && (
+                                        <button 
+                                            onClick={() => setShowFullHistory(true)}
+                                            className="w-full py-6 text-[10px] font-black uppercase tracking-widest text-[#E87A2C] bg-orange-500/5 rounded-[32px] border border-orange-500/10 active:scale-[0.98] transition-all"
+                                        >
+                                            MOSTRAR TUDO ({history.length} AULAS)
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
                     </>
                 );
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#1A110D] text-white p-6 pb-32 animate-fade-in font-sans">
+        <div className="min-h-screen bg-[#1A110D] text-white p-6 pb-32 animate-fade-in font-sans selection:bg-[#E87A2C] selection:text-white">
             {renderContent()}
+
+            {/* Modal de Detalhes da Aula (Adaptado do StudentPreview) */}
+            {selectedLesson && (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-[#1A110D] animate-in slide-in-from-bottom duration-300">
+                    {/* Header do Modal */}
+                    <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#1A110D] sticky top-0 z-10">
+                         <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-[#1A110D]">
+                                 <BookOpen className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h2 className="text-sm font-black uppercase tracking-tighter">Detalhes da Aula</h2>
+                                 <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">{new Date(selectedLesson.lesson_date).toLocaleDateString()}</p>
+                             </div>
+                         </div>
+                         <button 
+                            onClick={() => setSelectedLesson(null)}
+                            className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-rose-500 transition-colors"
+                         >
+                            <X className="w-6 h-6" />
+                         </button>
+                    </div>
+
+                    {/* Conteúdo do Modal (Scrollable) */}
+                    <div className="flex-grow overflow-y-auto p-6 space-y-10 no-scrollbar">
+                         {/* Pauta */}
+                         <section>
+                             <div className="flex items-center gap-2 mb-4">
+                                 <span className="w-8 h-1 bg-[#E87A2C] rounded-full"></span>
+                                 <p className="text-[10px] font-black text-white/40 uppercase tracking-widest leading-none">Diretriz Pedagógica</p>
+                             </div>
+                             <h3 className="text-3xl font-black text-white leading-tight uppercase tracking-tighter italic">
+                                 "{selectedLesson.objective || 'Foco em Desenvolvimento Prático'}"
+                             </h3>
+                         </section>
+
+                         {/* Harmonias e Digitações */}
+                         {selectedLesson.report_data?.chords?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Estrutura Harmônica</h4>
+                                     <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{selectedLesson.report_data.chords.length} ACORDES</span>
+                                 </div>
+                                 <div className="grid grid-cols-1 gap-6">
+                                     {selectedLesson.report_data.chords.map((chord: any, i: number) => (
+                                         <div key={i} className="flex flex-col items-center">
+                                             <ChordVisualizer 
+                                                 instrument={student?.instrument as any} 
+                                                 chordNotes={chord.notes}
+                                                 root={chord.root}
+                                                 type={chord.typeId}
+                                                 ext={chord.extId}
+                                                 bass={chord.bass}
+                                                 notesWithIndices={chord.notesWithIndices}
+                                                 isCustom={chord.isCustom}
+                                                 isFullscreen={true} // Força uma visualização levemente maior no modal mobile
+                                             />
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                         {/* Metas de Prática */}
+                         {selectedLesson.report_data?.exercises?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Checklist de Prática</h4>
+                                     <ListChecks className="w-5 h-5 text-white/20" />
+                                 </div>
+                                 <div className="space-y-3">
+                                     {selectedLesson.report_data.exercises.map((ex: string, i: number) => (
+                                         <div key={i} className="p-6 bg-white rounded-[32px] flex items-center gap-5 shadow-xl">
+                                             <div className="w-10 h-10 bg-[#1A110D] rounded-2xl flex items-center justify-center text-white text-lg font-black">{i+1}</div>
+                                             <p className="text-sm font-black text-[#3C2415] uppercase leading-tight">{ex}</p>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                         {/* Materiais Extra */}
+                         {selectedLesson.report_data?.tabs?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Tablaturas e Apoio</h4>
+                                     <Layout className="w-5 h-5 text-white/20" />
+                                 </div>
+                                 <div className="space-y-4">
+                                     {selectedLesson.report_data.tabs.map((tab: any, i: number) => (
+                                         <div key={i} className="bg-white p-6 rounded-[32px] overflow-x-auto no-scrollbar border-b-8 border-stone-200 shadow-xl">
+                                             <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mb-4">{tab.title || 'Tablatura'}</p>
+                                             <pre className="font-mono text-[#3C2415] text-[12px] leading-relaxed tracking-wider whitespace-pre">
+                                                 {tab.content}
+                                             </pre>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                         <div className="py-10 text-center opacity-20">
+                             <p className="text-[10px] font-black uppercase tracking-[0.4em]">MusiClass Digital Ecosystem</p>
+                         </div>
+                    </div>
+
+                    {/* Footer fixo do Modal */}
+                    <div className="p-6 bg-[#1A110D] border-t border-white/10">
+                         <button 
+                            onClick={() => setSelectedLesson(null)}
+                            className="w-full bg-[#E87A2C] text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-[0.2em] active:scale-[0.98] transition-all"
+                         >
+                            CONCLUÍDO
+                         </button>
+                    </div>
+                </div>
+            )}
 
             {/* Rodapé Navbar Mobile */}
             <nav className="fixed bottom-6 left-6 right-6 bg-white/10 backdrop-blur-xl border border-white/10 rounded-[32px] p-2 flex justify-around items-center shadow-2xl z-50">
