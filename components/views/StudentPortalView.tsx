@@ -65,6 +65,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
     const [activeTab, setActiveTab] = useState<'home' | 'ranking_students' | 'ranking_teachers' | 'curriculum' | 'tools' | 'settings'>('home');
     const [studyHistory, setStudyHistory] = useState<Record<string, number>>({}); // { '2023-10-27': 45 }
     const [progressToday, setProgressToday] = useState<{ minutes: number, done: boolean }>({ minutes: 0, done: false });
+    const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
     const [history, setHistory] = useState<LessonHistory[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [curriculumInfo, setCurriculumInfo] = useState<any>(null);
@@ -156,23 +157,17 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
             } finally {
                 setLoading(false);
             }
-        };
-
-        fetchStudentData();
-    const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
-
     useEffect(() => {
         if ("Notification" in window) {
             setPushStatus(Notification.permission as any);
             if (Notification.permission === "default") {
-                // Pequeno delay para não assustar no primeiro frame
-                setTimeout(() => {
-                    subscribeToPush();
-                }, 2000);
+                setTimeout(subscribeToPush, 3000);
             }
         }
     }, []);
-    }, [studentId]);
+        };
+
+        fetchStudentData();
 
     // Timer Logic
     useEffect(() => {
@@ -246,33 +241,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                 return (
                     <div className="pt-10">
                         <RankingView teachers={teachers} lessonHistory={[]} students={[]} />
-                    </div>
-                );
-            case 'curriculum':
-                return (
-                    <div className="pt-10 pb-20 space-y-8">
-                         <div className="flex items-center gap-4 mb-4">
-                             <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-white">
-                                 <GraduationCap className="w-6 h-6" />
-                             </div>
-                             <div>
-                                 <h2 className="text-xl font-black uppercase tracking-tighter">Plano de Estudos</h2>
-                                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Seu progresso pedagógico</p>
-                             </div>
-                         </div>
-                         
-                         {curriculumInfo?.pendingTopics?.map((t: any) => (
-                             <div key={t.id} className="bg-white/5 border border-white/10 rounded-[32px] p-6 space-y-4">
-                                 <div className="flex items-center justify-between">
-                                     <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-3 py-1 rounded-full bg-[#E87A2C]/5">MÊS {t.month_index}</span>
-                                     <BookOpen className="w-5 h-5 text-white/10" />
-                                 </div>
-                                 <h3 className="text-lg font-black text-white uppercase">{t.title}</h3>
-                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/5 whitespace-pre-wrap leading-relaxed text-sm text-white/80">
-                                     {t.content_text || 'Conteúdo teórico em desenvolvimento para este tópico.'}
-                                 </div>
-                             </div>
-                         ))}
                     </div>
                 );
             case 'tools':
@@ -452,6 +420,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
 
                                     <div className="relative z-10 flex flex-col items-center gap-16">
                                         {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any, idx: number) => {
+                                                            teacher_id: student?.teacher_id || "",
                                             const isPending = curriculumInfo.pendingTopics?.some((pt: any) => pt.id === t.id);
                                             const progress = curriculumInfo.progress?.find((p: any) => p.topic_id === t.id);
                                             const isCompleted = progress?.status === "quiz_completed";
@@ -649,16 +618,20 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                                    body: JSON.stringify({
                                                        teacher_id: student?.teacher_id,
                                                        title: '⚡ Nova Solicitação de Prova',
-                                                       body: `${student?.name} terminou de estudar e solicitou a prova de ${selectedLesson.objective}.`,
-                                                       url: `/students`
-                                                   })
-                                               });
-
-                                               showToast("Solicitação enviada! O professor irá liberar seu quiz em breve.", "success");
-                                               setSelectedLesson(null);
-                                           } catch (e) {
-                                               showToast("Você já solicitou esta prova ou houve um erro.", "error");
-                                           }
+                                                // Notificar Professor via Edge Function
+                                                const targetTeacher = selectedLesson?.teacher_id || student?.teacher_id;
+                                                if (targetTeacher) {
+                                                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notifications`, {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            teacher_id: targetTeacher,
+                                                            title: "⚡ Nova Solicitação de Prova",
+                                                            body: `${student?.name} terminou de estudar e solicitou a prova de ${selectedLesson.objective}.`,
+                                                            url: "/students"
+                                                        })
+                                                    });
+                                                }
                                        }}
                                        className="w-full bg-white text-[#1A110D] py-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all relative z-10"
                                    >
@@ -720,11 +693,11 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                  </div>
                                  <div className="space-y-4">
                                      {selectedLesson.report_data.tabs.map((tab: any, i: number) => (
-                                         <div key={i} className="bg-white p-6 rounded-[32px] overflow-x-auto no-scrollbar border-b-8 border-stone-200 shadow-xl">
-                                             <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mb-4">{tab.title || 'Tablatura'}</p>
-                                             <pre className="font-mono text-[#3C2415] text-[12px] leading-relaxed tracking-wider whitespace-pre">
-                                                 {tab.content}
-                                             </pre>
+                                            <div key={i} className="bg-white p-6 rounded-[32px] border-b-8 border-stone-200 shadow-xl overflow-hidden">
+                                                <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mb-4">{tab.title || "Matéria"}</p>
+                                                <div className="font-sans text-[#3C2415] text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words">
+                                                    {tab.content}
+                                                </div>
                                          </div>
                                      ))}
                                  </div>
