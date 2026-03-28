@@ -1,3 +1,4 @@
+import { supabase } from "../../lib/supabase";
 
 import { Bell } from 'lucide-react';
 import React from 'react';

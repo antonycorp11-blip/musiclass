@@ -157,6 +157,10 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
             } finally {
                 setLoading(false);
             }
+        };
+        fetchStudentData();
+    }, [studentId]);
+
     useEffect(() => {
         if ("Notification" in window) {
             setPushStatus(Notification.permission as any);
@@ -165,10 +169,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
             }
         }
     }, []);
-        };
-
-        fetchStudentData();
-
     // Timer Logic
     useEffect(() => {
         let interval: any;
@@ -258,7 +258,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                          <Toolbox />
                     </div>
                 );
-            case 'home':
+            case "home":
             default:
                 const weekdays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
                 const now = new Date();
@@ -286,10 +286,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                     const d = new Date();
                                     const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1; // 0=Seg, 6=Dom
                                     const diff = i - dayOfWeek;
-                                    const targetDate = new Date(d.setDate(d.getDate() + diff)).toISOString().split('T')[0];
-                                    const studiedMinutes = studyHistory[targetDate] || 0;
-                                    const isToday = i === dayOfWeek;
-
                                     return (
                                         <div key={day} className="flex flex-col items-center gap-2">
                                             <div className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center border transition-all ${studiedMinutes > 0 ? 'bg-emerald-500 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-rose-500/10 border-rose-500/20'}`}>
@@ -544,8 +540,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                         </div>
                     </div>
                 );
-
-    return (
+            default:
         <div className="min-h-screen bg-[#1A110D] text-white p-6 pb-32 animate-fade-in font-sans selection:bg-[#E87A2C] selection:text-white">
             {renderContent()}
 
@@ -625,13 +620,18 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                                         })
                                                     });
                                                 }
-                                       }}
-                                       className="w-full bg-white text-[#1A110D] py-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all relative z-10"
-                                   >
-                                       <Sparkles className="w-4 h-4 text-purple-600" /> Solicitar Prova Agora
-                                   </button>
-                               </section>
-                           )}
+                                                showToast("Solicitação enviada! O professor irá liberar seu quiz em breve.", "success");
+                                                setSelectedLesson(null);
+                                            } catch (e) {
+                                                showToast("Você já solicitou esta prova ou houve um erro.", "error");
+                                            }
+                                        }}
+                                        className="w-full bg-white text-[#1A110D] py-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all relative z-10"
+                                    >
+                                        <Sparkles className="w-4 h-4 text-purple-600" /> Solicitar Prova Agora
+                                    </button>
+                                </section>
+                            )}
                          {/* Harmonias e Digitações */}
                          {selectedLesson.report_data?.chords?.length > 0 && (
                              <section className="space-y-6">
@@ -862,6 +862,275 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                   <Trophy className="w-6 h-6" />
                 </button>
                 <button 
+                  onClick={() => setActiveTab("settings")}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "settings" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
+                >
+                  <BellRing className="w-6 h-6" />
+                </button>
+            </nav>
+        </div>
+        );
+    };
+
+    return (
+        <div className="min-h-screen bg-[#1A110D] text-white p-6 pb-32 animate-fade-in font-sans selection:bg-[#E87A2C] selection:text-white">
+            {renderContent()}
+
+            {/* Modal de Detalhes da Aula (Adaptado do StudentPreview) */}
+            {selectedLesson && (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-[#1A110D] animate-in slide-in-from-bottom duration-300">
+                    {/* Header do Modal */}
+                    <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#1A110D] sticky top-0 z-10">
+                         <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-[#E87A2C] rounded-2xl flex items-center justify-center text-[#1A110D]">
+                                 <BookOpen className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h2 className="text-sm font-black uppercase tracking-tighter">Detalhes da Aula</h2>
+                                 <p className="text-[10px] font-bold text-[#E87A2C] uppercase tracking-widest">{new Date(selectedLesson.lesson_date).toLocaleDateString()}</p>
+                             </div>
+                         </div>
+                         <button 
+                            onClick={() => setSelectedLesson(null)}
+                            className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center hover:bg-rose-500 transition-colors"
+                         >
+                            <X className="w-6 h-6" />
+                         </button>
+                    </div>
+
+                    {/* Conteúdo do Modal (Scrollable) */}
+                    <div className="flex-grow overflow-y-auto p-6 space-y-10 no-scrollbar">
+                         {/* Pauta */}
+                         <section>
+                             <div className="flex items-center gap-2 mb-4">
+                                 <span className="w-8 h-1 bg-[#E87A2C] rounded-full"></span>
+                                 <p className="text-[10px] font-black text-white/40 uppercase tracking-widest leading-none">Diretriz Pedagógica</p>
+                             </div>
+                             <h3 className="text-3xl font-black text-white leading-tight uppercase tracking-tighter italic">
+                                 "{selectedLesson.objective || "Foco em Desenvolvimento Prático"}"
+                             </h3>
+                         </section>
+
+                           {/* Botão Solicitar Prova (Contexto de Matéria) */}
+                           {selectedLesson.report_data?.tabs?.some((t: any) => t.isCurriculumContent) && (
+                               <section className="p-8 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 rounded-[40px] border border-white/5 space-y-6 relative overflow-hidden group">
+                                   <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-500/20 blur-3xl rounded-full group-hover:bg-purple-500/30 transition-all" />
+                                   
+                                   <div className="relative z-10 flex flex-col items-center text-center">
+                                       <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center mb-6 border border-white/10">
+                                           <GraduationCap className="w-8 h-8 text-purple-400" />
+                                       </div>
+                                       <h3 className="text-xl font-black text-white uppercase tracking-tighter">Desafio de Maestria</h3>
+                                       <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] mt-2 max-w-[200px]">Conclua o questionário para avançar na sua trilha</p>
+                                   </div>
+
+                                   <button 
+                                       onClick={async () => {
+                                           const topicId = selectedLesson.report_data.tabs.find((t: any) => t.topicId)?.topicId;
+                                           if (!topicId) return;
+                                           
+                                           try {
+                                               const { error } = await supabase.from("mc_exam_requests").insert({
+                                                   student_id: studentId,
+                                                   topic_id: topicId,
+                                                   status: "pending"
+                                               });
+                                               
+                                               if (error) throw error;
+                                               
+                                               // Notificar Professor via Edge Function
+                                                const targetTeacher = selectedLesson?.teacher_id || student?.teacher_id;
+                                                if (targetTeacher) {
+                                                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notifications`, {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            teacher_id: targetTeacher,
+                                                            title: "⚡ Nova Solicitação de Prova",
+                                                            body: `${student?.name} terminou de estudar e solicitou a prova de ${selectedLesson.objective}.`,
+                                                            url: "/students"
+                                                        })
+                                                    });
+                                                }
+
+                                               showToast("Solicitação enviada! O professor irá liberar seu quiz em breve.", "success");
+                                               setSelectedLesson(null);
+                                           } catch (e) {
+                                               showToast("Você já solicitou esta prova ou houve um erro.", "error");
+                                           }
+                                       }}
+                                       className="w-full bg-white text-[#1A110D] py-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all relative z-10"
+                                   >
+                                       <Sparkles className="w-4 h-4 text-purple-600" /> Solicitar Prova Agora
+                                   </button>
+                               </section>
+                           )}
+                         {/* Harmonias e Digitações */}
+                         {selectedLesson.report_data?.chords?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Estrutura Harmônica</h4>
+                                     <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{selectedLesson.report_data.chords.length} ACORDES</span>
+                                 </div>
+                                 <div className="grid grid-cols-1 gap-6">
+                                     {selectedLesson.report_data.chords.map((chord: any, i: number) => (
+                                         <div key={i} className="flex flex-col items-center">
+                                             <ChordVisualizer 
+                                                 instrument={student?.instrument as any} 
+                                                 chordNotes={chord.notes}
+                                                 root={chord.root}
+                                                 type={chord.typeId}
+                                                 ext={chord.extId}
+                                                 bass={chord.bass}
+                                                 notesWithIndices={chord.notesWithIndices}
+                                                 isCustom={chord.isCustom}
+                                                 isFullscreen={true} // Força uma visualização levemente maior no modal mobile
+                                             />
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                         {/* Metas de Prática */}
+                         {selectedLesson.report_data?.exercises?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Checklist de Prática</h4>
+                                     <ListChecks className="w-5 h-5 text-white/20" />
+                                 </div>
+                                 <div className="space-y-3">
+                                     {selectedLesson.report_data.exercises.map((ex: string, i: number) => (
+                                         <div key={i} className="p-6 bg-white rounded-[32px] flex items-center gap-5 shadow-xl">
+                                             <div className="w-10 h-10 bg-[#1A110D] rounded-2xl flex items-center justify-center text-white text-lg font-black">{i+1}</div>
+                                             <p className="text-sm font-black text-[#3C2415] uppercase leading-tight">{ex}</p>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                         {/* Materiais Extra */}
+                         {selectedLesson.report_data?.tabs?.length > 0 && (
+                             <section className="space-y-6">
+                                 <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Tablaturas e Apoio</h4>
+                                     <Layout className="w-5 h-5 text-white/20" />
+                                 </div>
+                                 <div className="space-y-4">
+                                     {selectedLesson.report_data.tabs.map((tab: any, i: number) => (
+                                            <div key={i} className="bg-white p-6 rounded-[32px] border-b-8 border-stone-200 shadow-xl overflow-hidden">
+                                                <p className="text-[10px] font-black text-[#E87A2C] uppercase tracking-widest mb-4">{tab.title || "Matéria"}</p>
+                                                <div className="font-sans text-[#3C2415] text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words">
+                                                    {tab.content}
+                                                </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </section>
+                         )}
+
+                           {/* Solos e Melodias */}
+                           {selectedLesson.report_data?.solos?.length > 0 && (
+                               <section className="space-y-6">
+                                   <div className="flex items-center justify-between">
+                                       <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Solos e Melodias</h4>
+                                       <Music className="w-5 h-5 text-white/20" />
+                                   </div>
+                                   <div className="space-y-6">
+                                       {selectedLesson.report_data.solos.map((solo: any, i: number) => (
+                                           <div key={i} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                               <p className="font-black text-[10px] uppercase text-[#E87A2C] mb-6 tracking-widest">{solo.title || `Melodia ${i + 1}`}</p>
+                                               <div className="flex flex-wrap gap-4">
+                                                   {(() => {
+                                                       const maxPos = Math.max(...(solo.notes || []).map((n: any) => n.position || 0), 0);
+                                                       const steps = Array.from({ length: maxPos + 1 });
+                                                       return steps.map((_, stepIdx) => {
+                                                           const harmonyNotes = (solo.notes || []).filter((n: any) => n.type === "harmony" && (n.position || 0) === stepIdx);
+                                                           const soloNotes = (solo.notes || []).filter((n: any) => n.type === "solo" && (n.position || 0) === stepIdx);
+                                                           if (harmonyNotes.length === 0 && soloNotes.length === 0) return null;
+                                                           return (
+                                                               <div key={stepIdx} className="flex flex-col gap-2 min-w-[60px] bg-white/5 p-3 rounded-2xl border border-white/10">
+                                                                   <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                       {harmonyNotes.map((n: any, idx: number) => (
+                                                                           <PdfIconBox key={idx} text={n.note} bgColor="bg-rose-600" />
+                                                                       ))}
+                                                                   </div>
+                                                                   <div className="h-px bg-white/10 w-full" />
+                                                                   <div className="flex flex-wrap gap-1 min-h-[24px]">
+                                                                       {soloNotes.map((n: any, idx: number) => (
+                                                                           <PdfIconBox key={idx} text={n.note} bgColor="bg-blue-600" />
+                                                                       ))}
+                                                                   </div>
+                                                               </div>
+                                                           );
+                                                       });
+                                                   })()}
+                                               </div>
+                                           </div>
+                                       ))}
+                                   </div>
+                               </section>
+                           )}
+
+
+
+                         {/* Seção Exclusiva de Bateria (Se houver ritmos/rudimentos) */}
+                         {selectedLesson.report_data?.drums && (
+                            <section className="space-y-8">
+                                <div className="flex items-center justify-between">
+                                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-[#E87A2C]">Estudo de Bateria</h4>
+                                     <Activity className="w-5 h-5 text-white/20" />
+                                </div>
+                                
+                                {selectedLesson.report_data.drums.rhythms?.map((r: any, rIdx: number) => (
+                                    <div key={rIdx} className="bg-white/5 p-6 rounded-[32px] border border-white/5">
+                                        <p className="text-[10px] font-black text-white/40 uppercase mb-4">{r.title}</p>
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {r.sequence?.map((parts: string[], sIdx: number) => (
+                                                <div key={sIdx} className={`min-w-[40px] h-20 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-1 ${sIdx % 4 === 0 ? "bg-white/5" : ""}`}>
+                                                    {parts.map(p => (
+                                                        <div key={p} className="w-4 h-4 rounded-md bg-[#E87A2C] flex items-center justify-center text-[8px] text-white font-black">
+                                                            {p === "kick" ? "🥁" : p === "snare" ? "⊚" : "×"}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </section>
+                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Barra de Navegação Inferior (Estilo App Nativo) */}
+            <nav className="fixed bottom-6 left-6 right-6 bg-[#1A110D]/80 backdrop-blur-2xl border border-white/10 h-20 rounded-[32px] flex items-center px-4 gap-2 z-[90] shadow-2xl">
+                <button 
+                  onClick={() => setActiveTab("home")}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "home" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
+                >
+                  <Home className="w-6 h-6" />
+                </button>
+                <button 
+                   onClick={() => setActiveTab("tools")}
+                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "tools" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
+                >
+                  <Activity className="w-6 h-6" />
+                </button>
+                <button 
+                  onClick={() => setActiveTab("ranking_students")}
+                  className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "ranking_students" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
+                >
+                  <Trophy className="w-6 h-6" />
+                </button>
+                <button 
+                   onClick={() => setActiveTab("ranking_teachers")}
+                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "ranking_teachers" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
+                >
+                  <Trophy className="w-6 h-6" />
+                </button>
                 <button 
                   onClick={() => setActiveTab("settings")}
                   className={`p-4 rounded-2xl flex-1 flex justify-center transition-all ${activeTab === "settings" ? "bg-[#E87A2C] text-white" : "text-white/40"}`}
