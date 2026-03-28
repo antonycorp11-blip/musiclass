@@ -165,11 +165,12 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                         transform: (!isExporting && viewScale < 1) ? `scale(${viewScale})` : 'none',
                         transformOrigin: 'top center',
                         marginBottom: (!isExporting && viewScale < 1) ? `-${(1 - viewScale) * 100}%` : '0',
-                        boxShadow: 'none'
+                        boxShadow: 'none',
+                        backgroundColor: '#ffffff'
                     }}
                 >
                     {/* Slim Header */}
-                    <div id="lesson-header" className="bg-[#1A110D] border-b-[6px] border-[#E87A2C]">
+                    <div id="lesson-header" style={{ backgroundColor: '#1A110D', borderBottom: '6px solid #E87A2C' }}>
                         <div 
                             className="flex flex-row items-center gap-0"
                             style={{ padding: `${designSettings?.headerPaddingV || 32}px ${designSettings?.headerPaddingH || 48}px` }}
