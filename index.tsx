@@ -27,12 +27,16 @@ window.onerror = (message, source, lineno, colno, error) => {
     return false;
 };
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
     <React.StrictMode>
-        <AuthProvider>
-            <AppWrapper />
-        </AuthProvider>
+        <ErrorBoundary>
+            <AuthProvider>
+                <AppWrapper />
+            </AuthProvider>
+        </ErrorBoundary>
     </React.StrictMode>
 );
 

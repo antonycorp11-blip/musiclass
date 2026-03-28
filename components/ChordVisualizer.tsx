@@ -73,11 +73,9 @@ export const ChordVisualizer: React.FC<Props> = ({ instrument, chordNotes, root,
             <text x="0" y="54%" dominantBaseline="middle" fill="#E87A2C" fontWeight="900" fontSize="24" style={{ letterSpacing: '-0.05em' }}>{fullChordName.toUpperCase()}</text>
           </svg>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-3 shrink-0">
           {chordNotes.map((n, i) => (
-            <div key={i} className="h-7 min-w-[36px] px-2 bg-white/20 rounded-xl border border-white/10 flex items-center justify-center shadow-lg">
-              <span className="text-[12px] font-black text-white uppercase tracking-tighter leading-none">{n}</span>
-            </div>
+             <span key={i} className="text-[14px] font-black text-white/80 uppercase tracking-tighter leading-none">{n}</span>
           ))}
         </div>
       </div>

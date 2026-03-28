@@ -33,6 +33,11 @@ import { useStudents } from './hooks/useStudents';
 import { useAuth } from './context/AuthContext';
 import { useLessonContext } from './context/LessonContext';
 import { useToast } from './context/ToastContext';
+import { useSchoolConfig } from './hooks/useSchoolConfig';
+import { useTeacherNotifications } from './hooks/useTeacherNotifications';
+import { useConfirmationLink } from './hooks/useConfirmationLink';
+import { useGlobalCurriculum } from './hooks/useGlobalCurriculum';
+import { useAppInstall } from './hooks/useAppInstall';
 
 // Views
 import { StudentsView } from './components/views/StudentsView';
@@ -42,7 +47,7 @@ import { AdminDashboardView } from './components/views/AdminDashboardView';
 import { LessonTemplatesView } from './components/views/LessonTemplatesView';
 import { CurriculumView } from './components/views/CurriculumView';
 import { QuizPlayer } from './components/QuizPlayer';
-import { fetchCurriculumTopics, applyTopicToStudent } from './services/curriculumService';
+
 import { RankingView } from './components/views/RankingView';
 import { CurriculumTopic, StudentTopicProgress } from './types';
 import { StudentCenterView } from './components/views/StudentCenterView';
@@ -93,185 +98,14 @@ const App: React.FC = () => {
   const [selBass, setSelBass] = useState('none');
   const [isManualChordOpen, setIsManualChordOpen] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-  const [quizToken, setQuizToken] = useState<string | null>(null);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
-  const [schoolConfig, setSchoolConfig] = useState<any>({
-    headerPaddingH: 48,
-    headerPaddingV: 32,
-    logoHeight: 48,
-    studentFontSize: 24,
-    teacherFontSize: 14,
-    logoOffset: 0,
-    studentOffset: 0,
-    teacherOffset: 0,
-    spacing: 24,
-    dividerColor: '#E87A2C66',
-    showMusiClass: true
-  });
-
-  const fetchSchoolConfig = async () => {
-    try {
-      const { data, error } = await supabase.from('mc_school_config').select('config').limit(1).single();
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data?.config) setSchoolConfig(data.config);
-    } catch (e) {
-      console.warn("Using default school config", e);
-    }
-  };
-
-  const updateSchoolConfig = async (newConfig: any) => {
-    setSchoolConfig(newConfig);
-    try {
-      const { data: existing } = await supabase.from('mc_school_config').select('id').limit(1).single();
-      if (existing) {
-        await supabase.from('mc_school_config').update({ config: newConfig }).eq('id', existing.id);
-      } else {
-        await supabase.from('mc_school_config').insert({ config: newConfig });
-      }
-    } catch (e) {
-      console.error("Error saving school config:", e);
-    }
-  };
-
-  useEffect(() => {
-    if (currentUser) fetchSchoolConfig();
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser && currentUser.role === 'teacher') {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-
-      const channel = supabase
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'mc_lesson_history',
-            filter: `teacher_id=eq.${currentUser.id}`
-          },
-          (payload) => {
-            const oldRead = payload.old.read_count || 0;
-            const newRead = payload.new.read_count || 0;
-
-            if (newRead > oldRead || (payload.new.is_read && !payload.old.is_read)) {
-              // Sound notification if possible
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-              audio.play().catch(() => { });
-
-              // Browser notification
-              if (Notification.permission === 'granted') {
-                const s = students.find(std => std.id === payload.new.student_id);
-                const sName = s ? s.name : 'Um aluno';
-                new Notification('Confirmação MusiClass!', {
-                  body: `${sName} confirmou o treino agora!`,
-                  icon: '/favicon.ico',
-                  requireInteraction: true
-                });
-              }
-              fetchInitialData();
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [currentUser]);
-
-  const [confirmationScreen, setConfirmationScreen] = useState<{ student: string, inst: string, session: string } | null>(null);
-
-  useEffect(() => {
-    const handleConfirmation = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('quiz');
-      if (token) setQuizToken(token);
-
-      const confirmReadId = params.get('confirm_read');
-      if (!confirmReadId) return;
-
-      console.log('Detectada solicitação de confirmação:', confirmReadId);
-
-      const session = params.get('session') || '1';
-      const sName = params.get('s_name') || 'Estudante';
-      const inst = params.get('inst') || 'Instrumento';
-
-      try {
-        const { data, error: fetchError } = await supabase.from('mc_lesson_history')
-          .select('read_count, interaction_log')
-          .eq('id', confirmReadId)
-          .single();
-
-        if (fetchError) throw fetchError;
-
-        const newCount = (data?.read_count || 0) + 1;
-        const oldLog = Array.isArray(data?.interaction_log) ? data.interaction_log : [];
-        const newLog = [...oldLog, {
-          session,
-          at: new Date().toISOString(),
-          student: sName,
-          instrument: inst
-        }];
-
-        const { error: updateError } = await supabase.from('mc_lesson_history')
-          .update({
-            is_read: true,
-            read_at: new Date().toISOString(),
-            read_count: newCount,
-            interaction_log: newLog
-          })
-          .eq('id', confirmReadId);
-
-        if (updateError) throw updateError;
-
-        console.log('Confirmação salva com sucesso!');
-        setConfirmationScreen({ student: sName, inst, session });
-        window.history.replaceState({}, document.title, "/");
-      } catch (err) {
-        console.error("Erro no fluxo de confirmação:", err);
-        showToast("Erro ao confirmar leitura. Por favor, avise seu professor.", "error");
-      }
-    };
-
-    handleConfirmation();
-  }, []);
-
-  // Dados Globais de Currículo para Alertas
-  const [allTopics, setAllTopics] = useState<CurriculumTopic[]>([]);
-  const [allProgress, setAllProgress] = useState<StudentTopicProgress[]>([]);
-
-  const fetchGlobalCurriculum = async () => {
-    try {
-      const groups = ['harmono_melodico', 'percussao', 'vocal'] as const;
-      const topicsPromises = groups.map(g => fetchCurriculumTopics(g));
-      const results = await Promise.all(topicsPromises);
-      const flatTopics = results.flat();
-      setAllTopics(flatTopics);
-
-      try {
-        const { data: progressData } = await supabase.from('mc_student_topics').select('*');
-        if (progressData) {
-          setAllProgress(progressData.map(p => ({
-            ...p,
-            topic: flatTopics.find(t => t.id === p.topic_id)
-          })));
-        }
-      } catch (e) {
-        console.warn("Tabela mc_student_topics ausente.");
-      }
-    } catch (e) { console.error("Erro ao buscar currículo global:", e); }
-  };
-
-  useEffect(() => {
-    if (currentUser) fetchGlobalCurriculum();
-  }, [currentUser]);
+  
+  const { schoolConfig, updateSchoolConfig } = useSchoolConfig(currentUser);
+  const { showInstallPrompt, setShowInstallPrompt, handleInstallApp } = useAppInstall();
+  const { confirmationScreen, setConfirmationScreen, quizToken, setQuizToken } = useConfirmationLink(showToast);
+  const { allTopics, allProgress } = useGlobalCurriculum(currentUser);
+  
+  useTeacherNotifications(currentUser, students, fetchInitialData);
 
   // Galeria e Biblioteca State
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -404,23 +238,7 @@ const App: React.FC = () => {
     }
   };
 
-    useEffect(() => {
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-            const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
-            if (!isInstalled) setShowInstallPrompt(true);
-        });
-    }, []);
 
-    const handleInstallApp = async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') console.log('User accepted');
-        setDeferredPrompt(null);
-        setShowInstallPrompt(false);
-    };
 
     const handleLogout = () => {
         logout();

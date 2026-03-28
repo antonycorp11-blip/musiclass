@@ -1,12 +1,12 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { ChordVisualizer } from './ChordVisualizer';
 import { Logo } from './Logo';
 import { Instrument, Level, SoloNote } from '../types';
 import { User, X, GraduationCap, Calendar, Music, FileText, Play, Headphones, Clock, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { exportToPrintPDF, exportToDigitalPDF } from '../services/pdfExportService';
+import { PdfIconBox, PdfTitle, PdfScaleCircle, PdfDrumPart } from './PdfUtils';
 
 
 interface StudentPreviewProps {
@@ -51,6 +51,12 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
     const shortStudentName = formatShortName(studentName);
 
     useEffect(() => {
+        console.group('[MusiClass] STUDENT PREVIEW LOADED');
+        console.log("DADOS DO ALUNO E CARGA DA AULA:", { 
+            studentName, instrument, objective, lessonId: initialLessonId,
+            chords, scales, exercises, tabs, solos, drums, recordings, designSettings 
+        });
+        console.groupEnd();
         const updateScale = () => {
             if (wrapperRef.current) {
                 const wrapperWidth = wrapperRef.current.offsetWidth - 32; // padding
@@ -85,226 +91,28 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
 
     const handleDownloadPrintPDF = async () => {
         setIsExporting(true);
-        try {
-            console.log('Iniciando exportação de PDF para Impressão (A4 Paginação)...');
-            if (onExport) await onExport();
-            // Pequeno delay para garantir que o layout adaptativo (colunas) foi aplicado
-            await new Promise(r => setTimeout(r, 1000));
-
-            const headerElem = document.getElementById('lesson-header');
-            const bodyElem = document.getElementById('lesson-body');
-
-            if (!headerElem || !bodyElem) {
-                showToast("Erro ao identificar componentes para impressão.", "error");
-                setIsExporting(false);
-                return;
-            }
-
-            // --- CONFIGURAÇÃO DE IMPRESSÃO PROFISSIONAL ---
-            const pdfWidth = 210; // A4 Width
-            const pdfPageHeight = 297; // A4 Height
-            const reductionFactor = 0.72; // Redução de ~30% conforme solicitado pelo usuário
-
-            // Largura visual do conteúdo centralizado
-            const contentWidth = pdfWidth * reductionFactor;
-            const xOffset = (pdfWidth - contentWidth) / 2;
-
-            // 1. Captura do Cabeçalho (Fixo em todas as páginas)
-            const headerCanvas = await html2canvas(headerElem, {
-                scale: 3,
-                useCORS: true,
-                backgroundColor: '#1A110D',
-                windowWidth: 1000 // Garante proporções de desktop para clareza
-            });
-            const headerImgData = headerCanvas.toDataURL('image/png', 1.0);
-            const headerPdfHeight = (headerCanvas.height * pdfWidth) / headerCanvas.width;
-
-            // 2. Captura do Corpo Completo
-            const bodyCanvas = await html2canvas(bodyElem, {
-                scale: 3,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                windowWidth: 1000
-            });
-            const bodyImgData = bodyCanvas.toDataURL('image/png', 1.0);
-
-            // Altura real que o corpo ocupará no PDF
-            const bodyVisualHeight = (bodyCanvas.height * contentWidth) / bodyCanvas.width;
-
-            const pdf = new jsPDF({
-                orientation: 'p',
-                unit: 'mm',
-                format: 'a4',
-                compress: true
-            });
-
-            // --- LÓGICA DE PAGINAÇÃO E REPETIÇÃO DE CABEÇALHO ---
-            const bodyAvailableHeightPerPage = pdfPageHeight - headerPdfHeight - 10; // 10mm margem segurança
-            let heightRemaining = bodyVisualHeight;
-            let currentOffset = 0;
-
-            while (heightRemaining > 0) {
-                // Passo A: Desenha o Corpo (imagem fatiada pelo offset negativo)
-                // O corpo começa logo abaixo do cabeçalho
-                pdf.addImage(
-                    bodyImgData,
-                    'PNG',
-                    xOffset,
-                    headerPdfHeight - currentOffset,
-                    contentWidth,
-                    bodyVisualHeight,
-                    undefined,
-                    'FAST'
-                );
-
-                // Passo B: Máscara de Proteção (Garante que o corpo não vaze para trás do cabeçalho)
-                pdf.setFillColor(255, 255, 255);
-                pdf.rect(0, 0, pdfWidth, headerPdfHeight, 'F');
-
-                // Passo C: Desenha o Cabeçalho (Sempre no topo, sobrepondo qualquer vazamento)
-                pdf.addImage(headerImgData, 'PNG', 0, 0, pdfWidth, headerPdfHeight, undefined, 'FAST');
-
-                // Passo D: Limpeza do Rodapé (Evita que o conteúdo vaze para a margem física da impressora)
-                if (heightRemaining > bodyAvailableHeightPerPage) {
-                    pdf.setFillColor(255, 255, 255);
-                    pdf.rect(0, pdfPageHeight - 5, pdfWidth, 5, 'F');
-                }
-
-                heightRemaining -= bodyAvailableHeightPerPage;
-                currentOffset += bodyAvailableHeightPerPage;
-
-                if (heightRemaining > 0) {
-                    pdf.addPage();
-                }
-            }
-
-            pdf.save(`${studentName} - IMPRESSAO - ${today}.pdf`);
-            showToast("PDF Profissional para Impressão gerado com sucesso!", "success");
-
-        } catch (error) {
-            console.error('Erro no Print PDF:', error);
-            showToast('Falha interna na geração do PDF de Impressão.', "error");
-        } finally {
-            setIsExporting(false);
-        }
+        await exportToPrintPDF({
+            studentName,
+            onExport,
+            onSuccess: (msg) => showToast(msg, "success"),
+            onError: (msg) => showToast(msg, "error")
+        });
+        setIsExporting(false);
     };
 
     const handleDownloadPDF = async () => {
         setIsExporting(true);
-        try {
-            console.log('Iniciando exportação de PDF...');
-            let currentId = lessonId;
-
-            // 1. Sincronização e Delay para estabilização do DOM
-            if (onExport) {
-                const result = await onExport();
-                if (result.lessonId) {
-                    currentId = result.lessonId;
-                    setLessonId(result.lessonId);
-                    // Delay extra para garantir que o React renderizou o botão de confirmação no DOM
-                    await new Promise(r => setTimeout(r, 600));
-                }
-            }
-            await new Promise(r => setTimeout(r, 400));
-
-            // Busca o elemento de forma robusta
-            const element = document.getElementById('lesson-document') || documentRef.current;
-
-            if (!element) {
-                showToast("Erro Fatal: O documento da aula não foi encontrado para exportação.", "error");
-                setIsExporting(false);
-                return;
-            }
-
-            console.log('Capturando canvas para PDF...');
-            const canvas = await html2canvas(element as HTMLElement, {
-                scale: 3.5, // Alta resolução (Top Quality)
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                windowWidth: 1200,
-            });
-
-            console.log('Gerando arquivo PDF...');
-            const imgData = canvas.toDataURL('image/png', 1.0); // PNG para máxima nitidez
-            const imgWidth = 210;
-            let imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            const pdf = new jsPDF({
-                orientation: 'p',
-                unit: 'mm',
-                format: [imgWidth, imgHeight],
-                compress: true
-            });
-
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-
-            // Mapeamento Blindado de Links
-            const cards = element.querySelectorAll('.audio-card-pdf');
-            cards.forEach((card) => {
-                const cardElement = card as HTMLElement;
-                const url = cardElement.dataset.url;
-                if (!url) return;
-
-                const rect = cardElement.getBoundingClientRect();
-                const parentRect = element.getBoundingClientRect();
-
-                const relTop = rect.top - parentRect.top;
-                const relLeft = rect.left - parentRect.left;
-
-                const pdfX = (relLeft * 210) / parentRect.width;
-                const pdfY = (relTop * imgHeight) / parentRect.height;
-                const pdfW = (rect.width * 210) / parentRect.width;
-                const pdfH = (rect.height * imgHeight) / parentRect.height;
-                pdf.link(pdfX, pdfY, pdfW, pdfH, { url });
-                
-                // Fallback de texto invisível (mesma cor do fundo principal para não destoar)
-                // Aumenta muito as chances do leitor de PDF do iOS/WhatsApp achar o link.
-                pdf.setTextColor(26, 17, 13); // #1A110D (fundo escuro onde o áudio fica)
-                pdf.setFontSize(8);
-                pdf.textWithLink('Ouvir', pdfX + 2, pdfY + 6, { url });
-            });
-
-            // 1.5 Captura o ID novo ou o existente de forma segura
-            const finalLessonId = currentId; // Ja atualizado pelo result.lessonId no topo
-
-            // Link de Confirmação Único
-            const confirmBtn = element.querySelector('.confirm-read-pdf-main');
-            if (confirmBtn) {
-                const rect = confirmBtn.getBoundingClientRect();
-                const parentRect = element.getBoundingClientRect();
-                const relTop = rect.top - parentRect.top;
-                const relLeft = rect.left - parentRect.left;
-
-                const pdfX = (relLeft * 210) / parentRect.width;
-                const pdfY = (relTop * imgHeight) / parentRect.height;
-                const pdfW = (rect.width * 210) / parentRect.width;
-                const pdfH = (rect.height * imgHeight) / parentRect.height;
-
-                const baseUrl = window.location.href.split('?')[0];
-                const fixedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-                const confirmUrl = `${fixedBase}?confirm_read=${finalLessonId}&session=1&s_name=${encodeURIComponent(studentName)}&inst=${encodeURIComponent(instrument)}`;
-                
-                pdf.link(pdfX, pdfY, pdfW, pdfH, { url: confirmUrl });
-                
-                // Fallback de texto invisível (mesma cor do botão espelhado para não atrapalhar)
-                // Se o PDF reader ignorar bbox puro, ele acha isso no canto
-                pdf.setTextColor(16, 185, 129); // #10B981 (bg-emerald-500)
-                pdf.setFontSize(8);
-                pdf.textWithLink('CONFIRMAR TREINO', pdfX + 1, pdfY + 4, { url: confirmUrl });
-            }
-
-            console.log('Salvando...');
-            pdf.save(`${studentName} - ${instrument} - ${today}.pdf`);
-
-            if ((window as any).logDebug) (window as any).logDebug('PDF baixado!');
-        } catch (error) {
-            console.error('Erro ao baixar PDF:', error);
-            showToast('Erro na Geracao do PDF: ' + (error instanceof Error ? error.message : "Falha desconhecida"), "error");
-        } finally {
-            setIsExporting(false);
-        }
+        await exportToDigitalPDF({
+            studentName,
+            instrument,
+            currentLessonId: lessonId,
+            documentElement: documentRef.current,
+            onExport,
+            onLessonIdUpdate: setLessonId,
+            onSuccess: (msg) => showToast(msg, "success"),
+            onError: (msg) => showToast(msg, "error")
+        });
+        setIsExporting(false);
     };
 
     return (
@@ -395,25 +203,19 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             >
                                 <div className="mb-2">
                                     <span 
-                                        className="font-black text-white uppercase tracking-tight leading-none whitespace-nowrap block"
-                                        style={{ fontSize: `${designSettings.studentFontSize}px` }}
+                                        className="font-black text-white uppercase tracking-tight leading-none truncate block"
+                                        style={{ fontSize: `${designSettings.studentFontSize || 24}px` }}
                                     >
                                         {shortStudentName}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex flex-wrap items-center gap-4">
                                     <span className="text-[12px] font-bold text-[#E87A2C] uppercase tracking-widest leading-none">
                                         {today}
                                     </span>
                                     {lessonCount !== undefined && (
                                         <div 
-                                            className="inline-flex items-center h-6 px-3 bg-[#E87A2C] rounded-md shrink-0 shadow-lg shadow-orange-500/20 relative"
-                                            style={{ 
-                                                left: `${designSettings?.badgeOffset || 0}px`,
-                                                top: `${designSettings?.badgeY || 0}px`,
-                                                transform: `scale(${designSettings?.badgeScale || 1})`,
-                                                transformOrigin: 'left center'
-                                            }}
+                                            className="inline-flex items-center justify-center h-6 px-3 bg-[#E87A2C] rounded-md shrink-0 shadow-lg shadow-orange-500/20"
                                         >
                                             <span className="text-[10px] font-black text-[#1A110D] uppercase tracking-tight leading-none pt-[1px]">Aula {lessonCount} {contractTotal ? `/ ${contractTotal}` : ''}</span>
                                         </div>
@@ -422,17 +224,17 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                             </div>
 
                             {/* Vertical Divider 2 */}
-                            <div className="h-12 w-[1px] bg-white/10 shrink-0 mx-8" />
+                            <div className="h-12 w-[1px] bg-white/10 shrink-0 mx-6" />
 
                             {/* Teacher Zone */}
                             <div 
-                                className="shrink-0 text-right flex flex-col justify-center w-[220px]"
+                                className="shrink-0 text-right flex flex-col justify-center max-w-[220px]"
                                 style={{ transform: `translateX(${designSettings.teacherOffset}px)` }}
                             >
                                 <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-1 leading-none">Instrutor</span>
                                 <span 
-                                    className="font-black text-white/70 uppercase tracking-tight leading-tight whitespace-nowrap"
-                                    style={{ fontSize: `${designSettings.teacherFontSize}px` }}
+                                    className="font-black text-white/70 uppercase tracking-tight leading-tight truncate"
+                                    style={{ fontSize: `${designSettings.teacherFontSize || 16}px` }}
                                 >
                                     Prof. {teacherName}
                                 </span>
@@ -513,9 +315,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 {/* Left Side: Solos */}
                                 {solos.length > 0 && (
                                     <div className={`${exercises.length > 0 ? 'col-span-8' : 'col-span-1'} space-y-6`}>
-                                        <svg viewBox="0 0 200 20" className="h-4 w-48">
-                                            <text x="0" y="50%" dominantBaseline="central" fill="#1C1917" fontWeight="900" fontSize="10" style={{ letterSpacing: '0.1em' }}>SOLOS E MELODIAS (BIMANUAL)</text>
-                                        </svg>
+                                        <PdfTitle title="SOLOS E MELODIAS (BIMANUAL)" />
                                         <div className="space-y-4">
                                             {solos.map((solo, i) => (
                                                 <div key={i} className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
@@ -534,21 +334,13 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                                     <div key={stepIdx} className="flex flex-col gap-1 min-w-[50px] bg-stone-100/50 p-2 rounded-xl border border-stone-100">
                                                                         <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                             {harmonyNotes.map((n, idx) => (
-                                                                                <div key={idx} className="h-6 w-6 bg-red-600 rounded-md shadow-sm">
-                                                                                    <svg viewBox="0 0 24 24" className="w-full h-full">
-                                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="10">{n.note}</text>
-                                                                                    </svg>
-                                                                                </div>
+                                                                                <PdfIconBox key={idx} text={n.note} bgColor="bg-red-600" />
                                                                             ))}
                                                                         </div>
                                                                         <div className="h-px bg-stone-200 w-full" />
                                                                         <div className="flex flex-wrap gap-1 min-h-[20px]">
                                                                             {soloNotes.map((n, idx) => (
-                                                                                <div key={idx} className="h-6 w-6 bg-blue-600 rounded-md shadow-sm">
-                                                                                    <svg viewBox="0 0 24 24" className="w-full h-full">
-                                                                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="10">{n.note}</text>
-                                                                                    </svg>
-                                                                                </div>
+                                                                                <PdfIconBox key={idx} text={n.note} bgColor="bg-blue-600" />
                                                                             ))}
                                                                         </div>
                                                                     </div>
@@ -565,22 +357,12 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                 {/* Right Side: Exercises */}
                                 {exercises.length > 0 && (
                                     <div className={`${solos.length > 0 ? 'col-span-4' : 'col-span-1'} space-y-10`}>
-                                        <svg viewBox="0 0 200 20" className="h-4 w-48">
-                                            <text x="0" y="50%" dominantBaseline="central" fill="#1C1917" fontWeight="900" fontSize="10" style={{ letterSpacing: '0.1em' }}>CHECKLIST DE PRÁTICA</text>
-                                        </svg>
+                                        <PdfTitle title="CHECKLIST DE PRÁTICA" />
                                         <div className={`space-y-2 ${solos.length === 0 ? 'grid grid-cols-2 gap-4 space-y-0' : ''}`}>
                                             {exercises.map((ex, i) => (
                                                 <div key={i} className="p-4 bg-white border border-stone-100 rounded-xl flex items-center gap-4 group transition-all hover:border-orange-100 shadow-sm">
-                                                    <div className="w-6 h-6 bg-[#1A110D] rounded-md text-white shrink-0 group-hover:bg-[#E87A2C]">
-                                                        <svg viewBox="0 0 24 24" className="w-full h-full">
-                                                            <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="currentColor" fontWeight="900" fontSize="10">{i + 1}</text>
-                                                        </svg>
-                                                    </div>
-                                                    <div className="h-4 flex-grow">
-                                                        <svg viewBox="0 0 400 20" className="h-full w-full">
-                                                            <text x="0" y="50%" dominantBaseline="central" fill="#3C2415" fontWeight="900" fontSize="11">{ex.toUpperCase()}</text>
-                                                        </svg>
-                                                    </div>
+                                                    <PdfIconBox text={i + 1} className="group-hover:bg-[#E87A2C]" />
+                                                    <span className="text-[11px] font-black uppercase text-[#3C2415] tracking-[0.1em] flex-grow leading-snug">{ex}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -618,11 +400,7 @@ export const StudentPreview: React.FC<StudentPreviewProps> = ({
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 justify-end flex-grow">
                                                     {scale.notes.map((n: string, ni: number) => (
-                                                        <div key={ni} className="w-9 h-9 bg-white/10 border border-white/10 rounded-xl shadow-lg">
-                                                            <svg viewBox="0 0 36 36" className="w-full h-full">
-                                                                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fill="white" fontWeight="900" fontSize="14">{n}</text>
-                                                            </svg>
-                                                        </div>
+                                                        <PdfScaleCircle key={ni} note={n} />
                                                     ))}
                                                 </div>
                                             </div>

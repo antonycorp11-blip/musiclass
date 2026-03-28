@@ -105,9 +105,9 @@ export const KeyboardVisualizer: React.FC<KeyboardVisualizerProps> = ({ chordNot
             {/* Chord Header - Compact & Professional */}
             <div className="bg-[#1A110D] py-3 px-4 flex justify-between items-center border-b border-black">
                 <h5 className="text-xl font-black text-[#E87A2C] uppercase leading-none">{fullChordName}</h5>
-                <div className="flex gap-1">
+                <div className="flex gap-2">
                     {chordNotes.map((n, i) => (
-                        <span key={i} className="inline-flex items-center justify-center w-7 h-5 text-[10px] font-bold text-white uppercase bg-white/10 rounded-md leading-none">
+                        <span key={i} className="text-[12px] font-black text-white/80 uppercase tracking-tighter leading-none">
                             {n}
                         </span>
                     ))}
