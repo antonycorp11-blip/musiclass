@@ -421,55 +421,71 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                             </section>
 
                             {/* Próximos Passos (Curriculum) - Estilo Map/Jornada */}
+                            {/* Trilha de Estudos (Estilo Candy Crush / Map) */}
                             {curriculumInfo && (
-                                <section className="space-y-10">
-                                    <div className="flex items-center justify-between px-2">
-                                        <h3 className="text-xl font-black uppercase tracking-tighter text-white flex items-center gap-3">
-                                            <Map className="w-6 h-6 text-[#E87A2C]" /> Jornada de Matérias
+                                <section className="relative py-10">
+                                    <div className="flex flex-col items-center mb-16 relative z-10">
+                                        <h3 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-3">
+                                            <Map className="w-8 h-8 text-[#E87A2C]" /> Trilha de Evolução
                                         </h3>
-                                        <span className="text-[10px] font-black text-[#E87A2C] uppercase border border-[#E87A2C]/20 px-4 py-2 rounded-full bg-[#E87A2C]/5">Nível {student?.level || 'I'}</span>
+                                        <div className="h-1 w-12 bg-[#E87A2C] rounded-full mt-2" />
                                     </div>
-                                    
-                                    <div className="space-y-4">
-                                        {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any) => {
+
+                                    {/* Linha da Trilha (SVG para o caminho curvo) */}
+                                    <div className="absolute inset-x-0 top-32 bottom-0 flex justify-center pointer-events-none">
+                                        <div className="w-px h-full bg-gradient-to-b from-[#E87A2C]/40 via-[#E87A2C]/20 to-transparent border-dashed border-l border-[#E87A2C]/20" />
+                                    </div>
+
+                                    <div className="relative z-10 flex flex-col items-center gap-16">
+                                        {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any, idx: number) => {
                                             const isPending = curriculumInfo.pendingTopics?.some((pt: any) => pt.id === t.id);
-                                            const title = t.title || 'Matéria sem título';
-                                            
+                                            const isCompleted = !isPending;
+                                            // Lógica de ziguezague para o "mapinha"
+                                            const align = idx % 2 === 0 ? 'ml-24' : 'mr-24';
+                                            const rotate = idx % 2 === 0 ? 'rotate-3' : '-rotate-3';
+
                                             return (
-                                                <button 
-                                                    key={t.id}
-                                                    onClick={() => setSelectedLesson({
-                                                        id: t.id,
-                                                        student_id: studentId,
-                                                        lesson_date: new Date().toISOString(),
-                                                        objective: title,
-                                                        report_data: {
-                                                            tabs: [{ title: 'Conteúdo Pedagógico', content: t.content_text || 'Em breve...' }]
-                                                        }
-                                                    } as any)}
-                                                    className={`w-full p-8 rounded-[40px] border transition-all text-left flex items-center justify-between group active:scale-[0.98] ${!isPending ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}
-                                                >
-                                                    <div className="flex items-center gap-6">
-                                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-xs ${!isPending ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-rose-500 shadow-lg shadow-rose-500/20'}`}>
+                                                <div key={t.id} className={`flex flex-col items-center group ${align}`}>
+                                                    <button
+                                                        onClick={() => setSelectedLesson({
+                                                            id: t.id,
+                                                            student_id: studentId,
+                                                            lesson_date: new Date().toISOString(),
+                                                            objective: t.title,
+                                                            report_data: {
+                                                                tabs: [{ 
+                                                                    title: 'Conteúdo Pedagógico', 
+                                                                    content: t.content_text || 'Em breve...',
+                                                                    isCurriculumContent: true, // Flag para mostrar o botão de prova
+                                                                    topicId: t.id
+                                                                }]
+                                                            }
+                                                        } as any)}
+                                                        className={`w-28 h-28 rounded-[35px] flex items-center justify-center transition-all duration-500 shadow-2xl relative ${rotate} group-hover:scale-110 active:scale-90 ${isCompleted ? 'bg-emerald-500 shadow-emerald-500/30' : 'bg-rose-500 shadow-rose-500/30'}`}
+                                                    >
+                                                        {isCompleted ? (
+                                                            <Trophy className="w-10 h-10 text-white" />
+                                                        ) : (
+                                                            <Star className="w-10 h-10 text-white animate-pulse" />
+                                                        )}
+                                                        
+                                                        {/* Badge de Mês */}
+                                                        <div className="absolute -top-3 -right-3 w-10 h-10 bg-[#1A110D] rounded-xl flex items-center justify-center border border-white/10 font-black text-[10px] text-white">
                                                             M{t.month_index}
                                                         </div>
-                                                        <div>
-                                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${!isPending ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                                {!isPending ? 'Concluído' : 'Matéria Pendente'}
-                                                            </p>
-                                                            <h4 className="text-lg font-black text-white uppercase tracking-tight line-clamp-1">{title}</h4>
-                                                        </div>
+                                                    </button>
+                                                    <div className="mt-4 text-center">
+                                                        <p className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {isCompleted ? 'Dominado' : 'Próxima Fase'}
+                                                        </p>
+                                                        <h4 className="text-white font-black text-sm uppercase tracking-tight max-w-[120px] leading-none mt-1">{t.title}</h4>
                                                     </div>
-                                                    <div className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${!isPending ? 'border-emerald-500/20 text-emerald-500' : 'border-rose-500/20 text-rose-500'}`}>
-                                                        <ChevronRight className="w-5 h-5" />
-                                                    </div>
-                                                </button>
+                                                </div>
                                             );
                                         })}
                                     </div>
                                 </section>
                             )}
-                            
                             {/* Histórico Simplificado */}
                             <section className="space-y-6">
                                 <h3 className="text-sm font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
@@ -584,6 +600,57 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                              </h3>
                          </section>
 
+                           {/* Botão Solicitar Prova (Contexto de Matéria) */}
+                           {selectedLesson.report_data?.tabs?.some((t: any) => t.isCurriculumContent) && (
+                               <section className="p-8 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 rounded-[40px] border border-white/5 space-y-6 relative overflow-hidden group">
+                                   <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-500/20 blur-3xl rounded-full group-hover:bg-purple-500/30 transition-all" />
+                                   
+                                   <div className="relative z-10 flex flex-col items-center text-center">
+                                       <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center mb-6 border border-white/10">
+                                           <GraduationCap className="w-8 h-8 text-purple-400" />
+                                       </div>
+                                       <h3 className="text-xl font-black text-white uppercase tracking-tighter">Desafio de Maestria</h3>
+                                       <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] mt-2 max-w-[200px]">Conclua o questionário para avançar na sua trilha</p>
+                                   </div>
+
+                                   <button 
+                                       onClick={async () => {
+                                           const topicId = selectedLesson.report_data.tabs.find((t: any) => t.topicId)?.topicId;
+                                           if (!topicId) return;
+                                           
+                                           try {
+                                               const { error } = await supabase.from('mc_exam_requests').insert({
+                                                   student_id: studentId,
+                                                   topic_id: topicId,
+                                                   status: 'pending'
+                                               });
+                                               
+                                               if (error) throw error;
+                                               
+                                               // Notificar Professor via Edge Function
+                                               await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notifications`, {
+                                                   method: 'POST',
+                                                   headers: { 'Content-Type': 'application/json' },
+                                                   body: JSON.stringify({
+                                                       teacher_id: student?.teacher_id,
+                                                       title: '⚡ Nova Solicitação de Prova',
+                                                       body: `${student?.name} terminou de estudar e solicitou a prova de ${selectedLesson.objective}.`,
+                                                       url: `/students`
+                                                   })
+                                               });
+
+                                               showToast("Solicitação enviada! O professor irá liberar seu quiz em breve.", "success");
+                                               setSelectedLesson(null);
+                                           } catch (e) {
+                                               showToast("Você já solicitou esta prova ou houve um erro.", "error");
+                                           }
+                                       }}
+                                       className="w-full bg-white text-[#1A110D] py-6 rounded-3xl font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all relative z-10"
+                                   >
+                                       <Sparkles className="w-4 h-4 text-purple-600" /> Solicitar Prova Agora
+                                   </button>
+                               </section>
+                           )}
                          {/* Harmonias e Digitações */}
                          {selectedLesson.report_data?.chords?.length > 0 && (
                              <section className="space-y-6">

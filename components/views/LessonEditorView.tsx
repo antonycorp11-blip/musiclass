@@ -1,4 +1,5 @@
 
+import { Bell } from 'lucide-react';
 import React from 'react';
 import {
     Zap, Settings2, MousePointer2, Trash2, Layout, X,
@@ -142,6 +143,52 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
     const [isAILoading, setIsAILoading] = React.useState(false);
     const [isSending, setIsSending] = React.useState(false);
 
+    const [examRequests, setExamRequests] = React.useState<any[]>([]);
+
+    React.useEffect(() => {
+        if (currentUser && selectedStudent) {
+            supabase.from('mc_exam_requests')
+                .select('*, mc_curriculum_topics(title)')
+                .eq('student_id', selectedStudent.id)
+                .eq('status', 'pending')
+                .then(({ data }) => setExamRequests(data || []));
+        }
+    }, [currentUser, selectedStudent]);
+
+    const handleApproveExam = async (req: any) => {
+        try {
+            // Criar token de quiz para o aluno
+            const token = Math.random().toString(36).substring(2, 15);
+            const { error: updateError } = await supabase.from('mc_student_topics').upsert({
+                student_id: selectedStudent.id,
+                topic_id: req.topic_id,
+                status: 'quiz_authorized',
+                qr_code_token: token
+            });
+
+            if (updateError) throw updateError;
+
+            // Marcar solicitação como aprovada
+            await supabase.from('mc_exam_requests').update({ status: 'approved' }).eq('id', req.id);
+
+            // Notificar Aluno
+            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notifications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    student_id: selectedStudent.id,
+                    title: '✅ Prova Liberada!',
+                    body: `Sua prova de ${req.mc_curriculum_topics?.title} foi autorizada. Boa sorte!`,
+                    url: `/?portal_id=${selectedStudent.id}`
+                })
+            });
+
+            showToast("Prova liberada e aluno notificado!", "success");
+            setExamRequests(examRequests.filter(r => r.id !== req.id));
+        } catch (e) {
+            showToast("Erro ao liberar prova.", "error");
+        }
+    };
     const handleSendToPortal = async () => {
         if (!selectedStudent || selectedStudent.id === 'temp') return;
         setIsSending(true);
@@ -225,6 +272,42 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 <div className="lg:col-span-8 space-y-12">
+                        {/* Solicitações de Prova Pendentes */}
+                        {examRequests.length > 0 && (
+                            <section className="bg-indigo-50 border-2 border-indigo-100 rounded-[48px] p-8 space-y-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
+                                        <Bell className="w-6 h-6 animate-swing" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-indigo-900 uppercase tracking-tighter">Solicitações de Prova</h3>
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-1">{examRequests.length} Estudo(s) Concluído(s)</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {examRequests.map(req => (
+                                        <div key={req.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-indigo-100 flex items-center justify-between group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 font-black text-xs">
+                                                    EX
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-indigo-900 uppercase tracking-tight text-sm">{req.mc_curriculum_topics?.title}</p>
+                                                    <p className="text-[9px] font-bold text-indigo-300 uppercase mt-1 tracking-widest">Aguardando autorização</p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleApproveExam(req)}
+                                                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] shadow-lg shadow-indigo-600/20 hover:scale-[1.05] active:scale-95 transition-all flex items-center gap-2"
+                                            >
+                                                <Check className="w-4 h-4" /> Liberar Prova
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     {/* Harmonias */}
                     {selectedStudent?.instrument !== Instrument.VOCALS && selectedStudent?.instrument !== Instrument.DRUMS && (
                         <section className="bg-white rounded-[48px] p-10 border border-[#3C2415]/5 shadow-sm">
