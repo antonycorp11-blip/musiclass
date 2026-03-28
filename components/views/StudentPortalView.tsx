@@ -420,7 +420,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
 
                                     <div className="relative z-10 flex flex-col items-center gap-16">
                                         {curriculumInfo.allTopics?.sort((a: any, b: any) => a.month_index - b.month_index).map((t: any, idx: number) => {
-                                                            teacher_id: student?.teacher_id || "",
                                             const isPending = curriculumInfo.pendingTopics?.some((pt: any) => pt.id === t.id);
                                             const progress = curriculumInfo.progress?.find((p: any) => p.topic_id === t.id);
                                             const isCompleted = progress?.status === "quiz_completed";
@@ -437,6 +436,7 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                                             objective: t.title,
                                                             report_data: {
                                                                 tabs: [{ 
+                                                            teacher_id: student?.teacher_id || "",
                                                                     title: 'Conteúdo Pedagógico', 
                                                                     content: t.content_text || 'Em breve...',
                                                                     isCurriculumContent: true, // Flag para mostrar o botão de prova
@@ -611,13 +611,6 @@ export const StudentPortalView: React.FC<Props> = ({ studentId, allStudents }) =
                                                
                                                if (error) throw error;
                                                
-                                               // Notificar Professor via Edge Function
-                                               await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notifications`, {
-                                                   method: 'POST',
-                                                   headers: { 'Content-Type': 'application/json' },
-                                                   body: JSON.stringify({
-                                                       teacher_id: student?.teacher_id,
-                                                       title: '⚡ Nova Solicitação de Prova',
                                                 // Notificar Professor via Edge Function
                                                 const targetTeacher = selectedLesson?.teacher_id || student?.teacher_id;
                                                 if (targetTeacher) {
