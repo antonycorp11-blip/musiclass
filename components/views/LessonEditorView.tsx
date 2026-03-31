@@ -83,6 +83,8 @@ interface LessonEditorViewProps {
     onToggleCurriculum: () => void;
     onAudioUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onSendToPortal?: () => Promise<void>;
+    onLoadLastLesson?: () => void;
+    onResetLesson?: () => void;
 }
 
 export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
@@ -138,7 +140,9 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
     onToggleGallery,
     onToggleCurriculum,
     onAudioUpload,
-    onSendToPortal
+    onSendToPortal,
+    onLoadLastLesson,
+    onResetLesson
 }) => {
     const { showToast } = useToast();
     const [isAILoading, setIsAILoading] = React.useState(false);
@@ -259,7 +263,23 @@ export const LessonEditorView: React.FC<LessonEditorViewProps> = ({
                         {selectedStudent.id === 'temp' ? 'Montando Modelo de Aula' : `Plano de Aula: ${selectedStudent.name}`}
                     </h2>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                    {onResetLesson && (
+                        <button onClick={() => {
+                            if (confirm("Tem certeza que deseja zerar a ficha atual? Todo o conteúdo não salvo será perdido.")) {
+                                onResetLesson();
+                            }
+                        }} className="bg-rose-50 text-rose-900 px-6 py-3 rounded-2xl flex items-center gap-4 border border-rose-100 hover:bg-rose-100 hover:text-rose-900 transition-all shadow-sm active:scale-95 cursor-pointer">
+                            <Trash2 className="w-5 h-5 text-rose-500" />
+                            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">LIMPAR FICHA</span>
+                        </button>
+                    )}
+                    {onLoadLastLesson && selectedStudent.id !== 'temp' && (
+                        <button onClick={onLoadLastLesson} className="bg-purple-50 text-purple-900 px-6 py-3 rounded-2xl flex items-center gap-4 border border-purple-100 hover:bg-purple-100 hover:text-purple-900 transition-all shadow-sm active:scale-95 cursor-pointer">
+                            <ScrollText className="w-5 h-5 text-purple-500" />
+                            <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">CARREGAR ÚLTIMA AULA</span>
+                        </button>
+                    )}
                     <button onClick={onToggleGallery} className="bg-[#FBF6F0] text-[#3C2415] px-6 py-3 rounded-2xl flex items-center gap-4 border border-[#3C2415]/5 hover:bg-[#E87A2C] hover:text-white transition-all">
                         <Layout className="w-5 h-5" />
                         <span className="text-xs font-black uppercase tracking-widest">Galeria de Aulas</span>

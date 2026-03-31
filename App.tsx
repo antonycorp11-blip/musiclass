@@ -531,16 +531,20 @@ const App: React.FC = () => {
           <StudentCenterView
             student={selectedStudent}
             teacher={currentUser}
-            onStartLesson={() => setActiveTab('lesson')}
+            onStartLesson={() => {
+                resetLesson();
+                setCurrentLessonId(null);
+                setActiveTab('lesson');
+            }}
             onViewHistory={(h) => {
-              setCurrentChords(h.report_data.chords || []);
-              setCurrentScales(h.report_data.scales || []);
-              setCurrentSolos(h.report_data.solos || []);
-              setCurrentTabs(h.report_data.tabs || []);
-              setExercises(h.report_data.exercises || []);
+              setCurrentChords(h.report_data?.chords || []);
+              setCurrentScales(h.report_data?.scales || []);
+              setCurrentSolos(h.report_data?.solos || []);
+              setCurrentTabs(h.report_data?.tabs || []);
+              setExercises(h.report_data?.exercises || []);
               setCurrentObjective(h.objective || '');
-              setRecordings(h.report_data.recordings || []);
-              setDrumsData(h.report_data.drums || { rhythms: [], rudiments: [], positions: undefined });
+              setRecordings(h.report_data?.recordings || []);
+              setDrumsData(h.report_data?.drums || { rhythms: [], rudiments: [], positions: undefined });
               setCurrentLessonId(h.id);
               setActiveTab('lesson');
             }}
@@ -586,6 +590,29 @@ const App: React.FC = () => {
             onToggleGallery={() => setIsGalleryOpen(true)}
             onToggleCurriculum={() => setIsCurriculumLibraryOpen(true)}
             onAudioUpload={handleAudioUpload}
+            onSendToPortal={async () => {
+                const result = await exportSuccess();
+                if (result.lessonId) setCurrentLessonId(result.lessonId);
+                await fetchInitialData();
+            }}
+            onLoadLastLesson={() => {
+                const lastCourse = lessonHistory.find(h => h.student_id === selectedStudent?.id);
+                if (lastCourse) {
+                    setCurrentChords(lastCourse.report_data?.chords || []);
+                    setCurrentScales(lastCourse.report_data?.scales || []);
+                    setCurrentSolos(lastCourse.report_data?.solos || []);
+                    setCurrentTabs(lastCourse.report_data?.tabs || []);
+                    setExercises(lastCourse.report_data?.exercises || []);
+                    setCurrentObjective(lastCourse.objective || '');
+                    setRecordings(lastCourse.report_data?.recordings || []);
+                    setDrumsData(lastCourse.report_data?.drums || { rhythms: [], rudiments: [], positions: undefined });
+                    setCurrentLessonId(lastCourse.id);
+                    // Não usa alert nativo para manter a estética, o UI pode reagir com toast se existir no app, ou só atualizar
+                } else {
+                    alert("Nenhuma sessão anterior encontrada para este aluno.");
+                }
+            }}
+            onResetLesson={resetLesson}
           />
         )}
 
@@ -597,14 +624,14 @@ const App: React.FC = () => {
             onSaveTemplateFromHistory={handleSaveTemplateFromHistory}
             onOpenLesson={(h) => {
               setSelectedStudent(students.find(s => s.id === h.student_id) || null);
-              setCurrentChords(h.report_data.chords || []);
-              setCurrentScales(h.report_data.scales || []);
-              setCurrentSolos(h.report_data.solos || []);
-              setCurrentTabs(h.report_data.tabs || []);
-              setExercises(h.report_data.exercises || []);
+              setCurrentChords(h.report_data?.chords || []);
+              setCurrentScales(h.report_data?.scales || []);
+              setCurrentSolos(h.report_data?.solos || []);
+              setCurrentTabs(h.report_data?.tabs || []);
+              setExercises(h.report_data?.exercises || []);
               setCurrentObjective(h.objective || '');
-              setRecordings(h.report_data.recordings || []);
-              setDrumsData(h.report_data.drums || { rhythms: [], rudiments: [], positions: undefined });
+              setRecordings(h.report_data?.recordings || []);
+              setDrumsData(h.report_data?.drums || { rhythms: [], rudiments: [], positions: undefined });
               setActiveTab('lesson');
             }}
             onDeleteLesson={handleDeleteLesson}
